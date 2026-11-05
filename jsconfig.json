@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "checkJs": false,
+    "noEmit": true
+  },
+  "exclude": [
+    "backend/static/js",
+    "node_modules",
+    ".venv"
+  ]
+}
