@@ -4,6 +4,7 @@ services:
     runtime: python
     buildCommand: pip install -r backend/requirements.txt
     startCommand: cd backend && gunicorn app:app --workers 2 --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/health
     envVars:
       - key: JWT_SECRET
         generateValue: true
