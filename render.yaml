@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: sales-buddy
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 2 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    disk:
+      name: salesbuddy-data
+      mountPath: /opt/render/project/src/backend
+      sizeGB: 1

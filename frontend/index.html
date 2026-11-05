@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Buddy 3.0</title>
+  <link rel="icon" type="image/png" href="/static/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="/static/react.min.js"></script>
+  <script src="/static/react-dom.min.js"></script>
+  <script src="/static/prop-types.min.js"></script>
+  <script src="/static/recharts.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Poppins',sans-serif;background:#f5f3f8;color:#1a0030}
+    .sidebar-link{display:flex;align-items:center;gap:.75rem;padding:.625rem 1rem;border-radius:.5rem;font-size:.875rem;font-weight:500;color:#d8b4fe;transition:background .15s;cursor:pointer;border:none;background:transparent;width:100%;text-align:left}
+    .sidebar-link:hover,.sidebar-link.active{background:#6b21a8;color:#fff}
+    .card{background:#fff;border-radius:.75rem;box-shadow:0 1px 3px rgba(75,0,110,.1);border:1px solid #e9d5ff;padding:1.25rem}
+    .input{width:100%;border:1px solid #c4b5fd;border-radius:.5rem;padding:.5rem .75rem;font-size:.875rem;outline:none;background:#fff;color:#1a0030;font-family:'Poppins',sans-serif}
+    .input:focus{border-color:#4B006E;box-shadow:0 0 0 2px rgba(75,0,110,.2)}
+    .label{display:block;font-size:.875rem;font-weight:500;color:#3b0764;margin-bottom:.25rem}
+    .btn{padding:.5rem 1rem;border-radius:.5rem;font-size:.875rem;font-weight:500;cursor:pointer;border:none;transition:background .15s;font-family:'Poppins',sans-serif}
+    .btn-primary{background:#4B006E;color:#fff}.btn-primary:hover{background:#3b0057}.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+    .btn-secondary{background:#fff;color:#3b0764;border:1px solid #c4b5fd}.btn-secondary:hover{background:#f5f3f8}
+    .btn-danger{background:#dc2626;color:#fff}.btn-danger:hover{background:#b91c1c}
+    .badge{display:inline-flex;align-items:center;padding:.2rem .6rem;border-radius:9999px;font-size:.75rem;font-weight:500}
+    .tbl{width:100%;font-size:.875rem;border-collapse:collapse}
+    .tbl th{background:#f5f3f8;text-align:left;font-size:.75rem;font-weight:600;color:#6b21a8;text-transform:uppercase;letter-spacing:.05em;padding:.75rem 1rem;white-space:nowrap}
+    .tbl td{padding:.5rem 1rem;border-bottom:1px solid #ede9fe}
+    .tbl tr:hover td{background:#faf5ff}
+    .status-done{background:#d1fae5;color:#065f46;display:inline-flex;align-items:center;padding:.2rem .6rem;border-radius:9999px;font-size:.75rem;font-weight:500}
+    .status-pending{background:#fef3c7;color:#92400e;display:inline-flex;align-items:center;padding:.2rem .6rem;border-radius:9999px;font-size:.75rem;font-weight:500}
+    .status-call-again{background:#dbeafe;color:#1e40af;display:inline-flex;align-items:center;padding:.2rem .6rem;border-radius:9999px;font-size:.75rem;font-weight:500}
+    .toast-wrap{position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;pointer-events:none}
+    .toast{padding:.75rem 1rem;border-radius:.5rem;font-size:.875rem;font-weight:500;animation:fadeIn .3s;max-width:24rem}
+    .toast-success{background:#4B006E;color:#e9d5ff}
+    .toast-error{background:#991b1b;color:#fee2e2}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-.5rem)}to{opacity:1;transform:translateY(0)}}
+    .modal-bg{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);padding:1rem}
+    .modal-box{background:#fff;border-radius:1rem;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-height:90vh;overflow-y:auto}
+    .modal-hd{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid #e9d5ff}
+    .modal-bd{padding:1.25rem 1.5rem}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:.875rem}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem}
+    .span2{grid-column:span 2}
+    .gauge-wrap{margin-bottom:.75rem}
+    .gauge-bar{height:10px;background:#f1f5f9;border-radius:9999px;overflow:hidden}
+    .gauge-fill{height:100%;border-radius:9999px;transition:width .3s}
+    select.input{-webkit-appearance:auto;appearance:auto}
+    textarea.input{resize:vertical}
+    a{color:inherit;text-decoration:none}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const {createElement:h,useState,useEffect,useCallback,createContext,useContext,useRef,Fragment} = React;
+const {BarChart,Bar,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,Legend} = Recharts;
+
+const API_BASE = '';  // same-origin, no prefix needed
+const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'];
+
+// ── Toast ──────────────────────────────────────────────────────────────────────
+function ToastContainer() {
+  const [toasts, setToasts] = useState([]);
+  window._showToast = (msg, type='success') => {
+    const id = Date.now();
+    setToasts(t => [...t, {id,msg,type}]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500);
+  };
+  return h('div',{className:'toast-wrap'},
+    toasts.map(t => h('div',{key:t.id,className:`toast toast-${t.type}`},t.msg))
+  );
+}
+const toast = {
+  success: m => window._showToast?.(m,'success'),
+  error:   m => window._showToast?.(m,'error'),
+};
+
+// ── Auth ───────────────────────────────────────────────────────────────────────
+const AuthCtx = createContext(null);
+function AuthProvider({children}) {
+  const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem('user')); } catch { return null; } });
+  const apiFetch = useCallback(async (path, opts={}) => {
+    const token = localStorage.getItem('token');
+    const isForm = opts.body instanceof FormData;
+    const headers = isForm ? {} : {'Content-Type':'application/json'};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch('/api' + path, {...opts, headers:{...headers,...(opts.headers||{})}});
+    if (res.status === 401) { localStorage.clear(); setUser(null); navigate('/login'); }
+    const data = await res.json();
+    if (!res.ok) throw {response:{data}};
+    return data;
+  }, []);
+  const login = async (email, password) => {
+    const data = await apiFetch('/auth/login', {method:'POST', body:JSON.stringify({email,password})});
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user); return data.user;
+  };
+  const register = async (form) => {
+    const data = await apiFetch('/auth/register', {method:'POST', body:JSON.stringify(form)});
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user); return data.user;
+  };
+  const logout = () => { localStorage.clear(); setUser(null); };
+  const refreshUser = async () => {
+    try { const u = await apiFetch('/users/me'); localStorage.setItem('user',JSON.stringify(u)); setUser(u); } catch {}
+  };
+  return h(AuthCtx.Provider, {value:{user,login,register,logout,refreshUser,apiFetch}}, children);
+}
+const useAuth = () => useContext(AuthCtx);
+
+// ── Router ─────────────────────────────────────────────────────────────────────
+function useRoute() {
+  const [hash, setHash] = useState(window.location.hash || '#/');
+  useEffect(() => {
+    const h = () => setHash(window.location.hash || '#/');
+    window.addEventListener('hashchange', h);
+    return () => window.removeEventListener('hashchange', h);
+  }, []);
+  return hash.replace('#','') || '/';
+}
+const navigate = path => { window.location.hash = '#' + path; };
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const el = (tag, props, ...kids) => h(tag, props, ...kids);
+const inp = (val, onChange, extra={}) => h('input', {className:'input', value:val, onChange:e=>onChange(e.target.value), ...extra});
+const sel = (val, onChange, opts, extra={}) => h('select', {className:'input', value:val, onChange:e=>onChange(e.target.value), ...extra},
+  opts.map(([v,l]) => h('option',{key:v,value:v},l||v))
+);
+const btn = (label, onClick, cls='btn btn-primary', extra={}) => h('button',{className:cls,onClick,...extra},label);
+const lbl = txt => h('label',{className:'label'},txt);
+const fld = (label, child) => h('div',null, lbl(label), child);
+
+function Modal({open, onClose, title, children, maxWidth='36rem'}) {
+  if (!open) return null;
+  return h('div',{className:'modal-bg',onClick:e=>e.target===e.currentTarget&&onClose()},
+    h('div',{className:'modal-box',style:{maxWidth}},
+      h('div',{className:'modal-hd'},
+        h('h2',{style:{fontSize:'1.125rem',fontWeight:600}},title),
+        h('button',{onClick:onClose,style:{background:'none',border:'none',fontSize:'1.5rem',cursor:'pointer',color:'#94a3b8',lineHeight:1}},'×')
+      ),
+      h('div',{className:'modal-bd'},children)
+    )
+  );
+}
+
+function StatusBadge({status}) {
+  const cls = status==='Done' ? 'status-done' : status==='Pending' ? 'status-pending' : 'status-call-again';
+  return h('span',{className:cls},status);
+}
+
+function Gauge({label, val, max}) {
+  const pct = max > 0 ? Math.min(100,(val/max)*100) : 0;
+  const col = pct>=100?'#10b981':pct>=75?'#3b82f6':pct>=50?'#f59e0b':'#ef4444';
+  return h('div',{className:'gauge-wrap'},
+    h('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'.75rem',color:'#64748b',marginBottom:'.375rem'}},
+      h('span',null,label), h('span',{style:{fontWeight:600}},pct.toFixed(1)+'%')
+    ),
+    h('div',{className:'gauge-bar'},h('div',{className:'gauge-fill',style:{width:`${pct}%`,background:col}})),
+    h('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'.75rem',color:'#94a3b8',marginTop:'.25rem'}},
+      h('span',null,'₱'+Number(val).toLocaleString()), h('span',null,'₱'+Number(max).toLocaleString())
+    )
+  );
+}
+
+// ── Icon helper (inline SVG) ───────────────────────────────────────────────────
+const ICONS = {
+  'layout-dashboard': '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  'users':            '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  'clipboard-list':   '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+  'calendar-days':    '<rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/>',
+  'target':           '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  'trending-up':      '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  'banknote':         '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+  'git-branch':       '<line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  'upload-cloud':     '<polyline points="16 16 12 12 8 16"/><line x1="12" x2="12" y1="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>',
+  'tag':              '<path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.41 0l7.29-7.29a1 1 0 0 0 0-1.41z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/>',
+  'user-cog':         '<circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4"/><circle cx="19" cy="18" r="3"/><path d="m21.7 16.4-.9.4"/><path d="m17.2 19.2-.9.4"/><path d="m16.3 16.4.9.4"/><path d="m20.8 19.2.9.4"/><path d="m19 15v1"/><path d="m19 21v1"/><path d="m22 18h-1"/><path d="m16 18h-1"/>',
+  'settings':         '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  'log-out':          '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
+  'circle-check-big': '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
+  'clock':            '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  'bar-chart-2':      '<line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>',
+  'triangle-alert':   '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>',
+  'file-spreadsheet': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/>',
+  'alert-triangle':   '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>',
+  'school':           '<path d="M14 22v-4a2 2 0 1 0-4 0v4"/><path d="m18 10 3.447 1.724a1 1 0 0 1 .553.894V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7.382a1 1 0 0 1 .553-.894L6 10"/><path d="M18 5v17"/><path d="M6 5v17"/><path d="m4 6 7.106-3.553a2 2 0 0 1 1.788 0L20 6"/><rect x="9" y="12" width="6" height="5" rx="1"/>',
+  'file-text':        '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/>',
+  'loader':           '<line x1="12" x2="12" y1="2" y2="6"/><line x1="12" x2="12" y1="18" y2="22"/><line x1="4.93" x2="7.76" y1="4.93" y2="7.76"/><line x1="16.24" x2="19.07" y1="16.24" y2="19.07"/><line x1="2" x2="6" y1="12" y2="12"/><line x1="18" x2="22" y1="12" y2="12"/><line x1="4.93" x2="7.76" y1="19.07" y2="16.24"/><line x1="16.24" x2="19.07" y1="7.76" y2="4.93"/>',
+  'circle-x':         '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  'milestone':        '<path d="M18 6H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h13l4-3.5z"/><path d="M12 13v8"/><path d="M12 2v4"/>',
+  'circle-check-big': '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
+};
+const Icon = (name, size=16, style={}) => {
+  const d = ICONS[name] || '<circle cx="12" cy="12" r="10"/>';
+  return h('svg', {
+    xmlns:'http://www.w3.org/2000/svg', width:size, height:size,
+    viewBox:'0 0 24 24', fill:'none', stroke:'currentColor',
+    strokeWidth:'2', strokeLinecap:'round', strokeLinejoin:'round',
+    style:{display:'inline-block',flexShrink:0,verticalAlign:'middle',...style},
+    dangerouslySetInnerHTML:{__html:d}
+  });
+};
+
+// ── Landing ────────────────────────────────────────────────────────────────────
+function Landing() {
+  return h('div',{style:{minHeight:'100vh',background:'linear-gradient(135deg,#4B006E,#2d0042,#1a0030)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'#fff',padding:'2rem'}},
+    h('div',{style:{maxWidth:'680px',textAlign:'center'}},
+      h('img',{src:'/static/logo.png',alt:'Sales Buddy 3.0',style:{height:'120px',marginBottom:'1.5rem',borderRadius:'1rem'}}),
+      h('p',{style:{fontSize:'1.25rem',color:'#d8b4fe',marginBottom:'2.5rem'}},"All-in-one sales management platform for City Savings Bank's Salary and Pension Loans teams."),
+      h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'2.5rem',textAlign:'left'}},
+        [['users','Lead Management','Register & track leads across DepEd, Beyond DepEd, and Pension sectors.'],
+         ['clipboard-list','Activity Tracking','Log field engagements, calls, visits and monitor real-time statuses.'],
+         ['target','Performance Analytics','Track targets, attainments, and productivity by branch or region.'],
+         ['upload-cloud','Data Uploads','Bulk import MOB, LCS, Daily LR, and DepEd reloan data via CSV.']
+        ].map(([icon,t,d],i)=>h('div',{key:i,style:{background:'rgba(255,255,255,.08)',borderRadius:'.75rem',padding:'1rem'}},
+          h('div',{style:{marginBottom:'.5rem'}},Icon(icon,28,{color:'#e9d5ff'})),
+          h('div',{style:{fontWeight:600,fontSize:'1rem',marginBottom:'.25rem'}},t),
+          h('div',{style:{fontSize:'.875rem',color:'#d8b4fe'}},d)
+        ))
+      ),
+      h('div',{style:{display:'flex',gap:'1rem',justifyContent:'center'}},
+        h('button',{className:'btn btn-primary',style:{padding:'.875rem 2rem',fontSize:'1rem'},onClick:()=>navigate('/login')},'Sign In'),
+        h('button',{onClick:()=>navigate('/register'),style:{background:'rgba(255,255,255,.12)',color:'#fff',padding:'.875rem 2rem',borderRadius:'.5rem',fontSize:'1rem',fontWeight:500,cursor:'pointer',border:'1px solid rgba(255,255,255,.3)',fontFamily:"'Poppins',sans-serif"}},'Register')
+      ),
+      h('p',{style:{marginTop:'2rem',fontSize:'.75rem',color:'#d8b4fe'}},'City Savings Bank · Internal Use Only')
+    )
+  );
+}
+
+// ── Login ──────────────────────────────────────────────────────────────────────
+function Login() {
+  const {login} = useAuth();
+  const [email,setEmail] = useState('');
+  const [pass,setPass] = useState('');
+  const [loading,setLoading] = useState(false);
+  const submit = async e => {
+    e.preventDefault(); setLoading(true);
+    try { await login(email,pass); toast.success('Welcome back!'); navigate('/dashboard'); }
+    catch(err) { toast.error(err?.response?.data?.error||'Login failed'); }
+    finally { setLoading(false); }
+  };
+  return h('div',{style:{minHeight:'100vh',display:'flex',fontFamily:"'Poppins',sans-serif"}},
+    // ── Left panel ──
+    h('div',{style:{flex:'1',background:'linear-gradient(160deg,#4B006E 0%,#2d0042 60%,#1a0030 100%)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'3rem',color:'#fff',position:'relative',overflow:'hidden'}},
+      // decorative circles
+      h('div',{style:{position:'absolute',top:'-4rem',right:'-4rem',width:'18rem',height:'18rem',borderRadius:'50%',background:'rgba(255,255,255,.05)'}}),
+      h('div',{style:{position:'absolute',bottom:'-5rem',left:'-5rem',width:'22rem',height:'22rem',borderRadius:'50%',background:'rgba(255,255,255,.04)'}}),
+      h('div',{style:{position:'relative',zIndex:1,textAlign:'center',maxWidth:'26rem'}},
+        h('img',{src:'/static/logo.png',alt:'Sales Buddy 3.0',style:{height:'120px',borderRadius:'1.25rem',marginBottom:'2rem',boxShadow:'0 8px 32px rgba(0,0,0,.3)'}}),
+        h('h2',{style:{fontSize:'1.75rem',fontWeight:700,marginBottom:'.75rem',lineHeight:1.3}},'Your sales command center'),
+        h('p',{style:{fontSize:'.95rem',color:'rgba(255,255,255,.7)',lineHeight:1.7}},"Track leads, monitor targets, and manage activities for City Savings Bank's Salary and Pension Loans teams."),
+        h('div',{style:{display:'flex',flexDirection:'column',gap:'.6rem',marginTop:'2rem',textAlign:'left'}},
+          [['circle-check-big','Lead & activity tracking'],['bar-chart-2','Performance analytics'],['milestone','Branch target management']].map(([icon,txt],i)=>
+            h('div',{key:i,style:{display:'flex',alignItems:'center',gap:'.75rem',fontSize:'.875rem',color:'rgba(255,255,255,.8)'}},
+              Icon(icon,16,{color:'#e9d5ff',flexShrink:0}), txt
+            )
+          )
+        )
+      ),
+      h('p',{style:{position:'absolute',bottom:'1.5rem',fontSize:'.7rem',color:'rgba(255,255,255,.35)',letterSpacing:'.05em',textTransform:'uppercase'}},
+        'City Savings Bank · Internal Use Only'
+      )
+    ),
+    // ── Right panel ──
+    h('div',{style:{width:'460px',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',background:'#fff',padding:'3rem 2.5rem'}},
+      h('div',{style:{width:'100%',maxWidth:'360px'}},
+        h('div',{style:{marginBottom:'2.25rem'}},
+          h('h1',{style:{fontSize:'1.75rem',fontWeight:700,color:'#1a0030',marginBottom:'.375rem'}},'Welcome back'),
+          h('p',{style:{fontSize:'.9rem',color:'#6b21a8',fontWeight:400}},'Sign in to your account')
+        ),
+        h('form',{onSubmit:submit,style:{display:'flex',flexDirection:'column',gap:'1.1rem'}},
+          h('div',null,
+            h('label',{style:{display:'block',fontSize:'.8rem',fontWeight:600,color:'#3b0764',marginBottom:'.375rem',letterSpacing:'.03em',textTransform:'uppercase'}},'Email'),
+            inp(email,setEmail,{type:'email',placeholder:'you@csb.com',required:true,style:{padding:'.75rem 1rem',fontSize:'.9rem'}})
+          ),
+          h('div',null,
+            h('label',{style:{display:'block',fontSize:'.8rem',fontWeight:600,color:'#3b0764',marginBottom:'.375rem',letterSpacing:'.03em',textTransform:'uppercase'}},'Password'),
+            inp(pass,setPass,{type:'password',placeholder:'••••••••',required:true,style:{padding:'.75rem 1rem',fontSize:'.9rem'}})
+          ),
+          h('button',{className:'btn btn-primary',type:'submit',disabled:loading,style:{width:'100%',padding:'.875rem',fontSize:'1rem',marginTop:'.25rem',borderRadius:'.625rem',letterSpacing:'.02em'}},
+            loading?'Signing in…':'Sign In'
+          )
+        ),
+        h('div',{style:{marginTop:'1.75rem',padding:'.875rem 1rem',background:'#faf5ff',borderRadius:'.625rem',fontSize:'.75rem',color:'#3b0764',border:'1px solid #e9d5ff',lineHeight:1.8}},
+          h('div',{style:{fontWeight:600,marginBottom:'.2rem',fontSize:'.8rem'}},'Demo accounts'),
+          h('div',null,'admin@csb.com / Admin@123'),
+          h('div',null,'ash@csb.com / Ash@1234'),
+          h('div',null,'sa1@csb.com / Sa@12345')
+        ),
+        h('p',{style:{textAlign:'center',fontSize:'.875rem',color:'#6b21a8',marginTop:'1.5rem'}},
+          "Don't have an account? ",h('a',{href:'#/register',style:{color:'#4B006E',fontWeight:600}},'Register')
+        )
+      )
+    )
+  );
+}
+
+// ── Register ───────────────────────────────────────────────────────────────────
+function Register() {
+  const {register,apiFetch} = useAuth();
+  const [branches,setBranches] = useState([]);
+  const [loading,setLoading] = useState(false);
+  const [form,setForm] = useState({email:'',password:'',full_name:'',employee_id:'',role:'SA',agency:'DEPED',region_name:'',branch_code:'',branch_name:'',reports_to:''});
+  const sf = k => v => setForm(f=>({...f,[k]:v}));
+  useEffect(()=>{ apiFetch('/reports/branches').then(setBranches).catch(()=>{}); },[]);
+  const regions = [...new Set(branches.map(b=>b.region_name))];
+  const filtB = branches.filter(b=>b.region_name===form.region_name);
+  const submit = async e => {
+    e.preventDefault(); setLoading(true);
+    try { await register(form); toast.success('Registered!'); navigate('/dashboard'); }
+    catch(err) { toast.error(err?.response?.data?.error||'Registration failed'); }
+    finally { setLoading(false); }
+  };
+  return h('div',{style:{minHeight:'100vh',background:'linear-gradient(135deg,#0f172a,#1e3a8a,#0f172a)',display:'flex',alignItems:'center',justifyContent:'center',padding:'1rem'}},
+    h('div',{style:{background:'#fff',borderRadius:'1.25rem',boxShadow:'0 25px 60px rgba(0,0,0,.3)',width:'100%',maxWidth:'520px',padding:'2rem'}},
+      h('div',{style:{textAlign:'center',marginBottom:'1.5rem'}},
+        h('div',{style:{fontSize:'2.5rem',marginBottom:'.5rem'}},'💼'),
+        h('h1',{style:{fontSize:'1.5rem',fontWeight:800,color:'#0f172a'}},'Create Account')
+      ),
+      h('form',{onSubmit:submit},
+        h('div',{className:'grid2',style:{gap:'.875rem'}},
+          fld('Full Name *', inp(form.full_name,sf('full_name'),{placeholder:'First Middle Last',required:true})),
+          fld('Employee ID *', inp(form.employee_id,sf('employee_id'),{placeholder:'EMP-001',required:true})),
+          h('div',{className:'span2'}, fld('CSB Email *', inp(form.email,sf('email'),{type:'email',placeholder:'you@csb.com',required:true}))),
+          h('div',{className:'span2'}, fld('Password *', inp(form.password,sf('password'),{type:'password',placeholder:'Min 6 chars',required:true,minLength:6}))),
+          fld('Role *', sel(form.role,sf('role'),[['SA'],['ASH'],['RSH'],['SH'],['Admin']])),
+          fld('Agency *', sel(form.agency,sf('agency'),[['DEPED'],['BEYOND_DEPED'],['PENSION']],{disabled:form.role==='Admin'})),
+          h('div',{className:'span2'}, fld('Region *', h('select',{className:'input',value:form.region_name,onChange:e=>setForm(f=>({...f,region_name:e.target.value,branch_code:'',branch_name:''})),required:true},
+            h('option',{value:''},'Select region...'), regions.map(r=>h('option',{key:r,value:r},r))
+          ))),
+          fld('Branch Code', h('select',{className:'input',value:form.branch_code,onChange:e=>{const b=filtB.find(x=>x.branch_code===e.target.value);setForm(f=>({...f,branch_code:e.target.value,branch_name:b?.branch_name||''}));}},
+            h('option',{value:''},'Select...'), filtB.map(b=>h('option',{key:b.branch_code,value:b.branch_code},b.branch_code))
+          )),
+          fld('Branch Name', inp(form.branch_name,()=>{},{readOnly:true,style:{background:'#f8fafc'}})),
+          h('div',{className:'span2'}, fld('Reporting To (email)', inp(form.reports_to,sf('reports_to'),{placeholder:'supervisor@csb.com'}))),
+          h('div',{className:'span2'}, h('button',{className:'btn btn-primary',type:'submit',disabled:loading,style:{width:'100%',padding:'.75rem',fontSize:'1rem'}},loading?'Registering...':'Create Account'))
+        )
+      ),
+      h('p',{style:{textAlign:'center',fontSize:'.875rem',color:'#64748b',marginTop:'1rem'}},
+        'Already registered? ',h('a',{href:'#/login',style:{color:'#2563eb',fontWeight:500}},'Sign In')
+      )
+    )
+  );
+}
+
+// ── Layout ─────────────────────────────────────────────────────────────────────
+const NAV = [
+  {path:'/dashboard',icon:'layout-dashboard',label:'Dashboard',roles:['SA','ASH','RSH','SH','Admin']},
+  {path:'/customers',icon:'users',label:'Customers',roles:['SA','ASH','RSH','SH','Admin']},
+  {path:'/activities',icon:'clipboard-list',label:'Activities',roles:['SA','ASH','RSH','SH','Admin']},
+  {path:'/calendar',icon:'calendar-days',label:'Calendar',roles:['SA','ASH','RSH','SH','Admin']},
+  {path:'/targets',icon:'target',label:'Targets',roles:['SA','ASH','RSH','SH','Admin']},
+  {path:'/target-shares',icon:'trending-up',label:'Target Shares',roles:['ASH','RSH','SH','Admin']},
+  {path:'/daily-lr',icon:'banknote',label:'Daily LR',roles:['ASH','RSH','SH','Admin']},
+  {path:'/assign',icon:'git-branch',label:'Assign Leads',roles:['ASH','RSH','SH','Admin']},
+  {path:'/uploads',icon:'upload-cloud',label:'Uploads',roles:['Admin']},
+  {path:'/promos',icon:'tag',label:'Promos',roles:['SA','ASH','RSH','SH','Admin']},
+  {path:'/users',icon:'user-cog',label:'Users',roles:['ASH','RSH','SH','Admin']},
+];
+function Layout({page}) {
+  const {user,logout} = useAuth();
+  const [collapsed,setCollapsed] = useState(false);
+  const route = useRoute();
+  const visible = NAV.filter(n=>n.roles.includes(user?.role));
+  return h('div',{style:{display:'flex',height:'100vh',background:'#f5f3f8'}},
+    h('aside',{style:{width:collapsed?'4rem':'15rem',background:'#4B006E',display:'flex',flexDirection:'column',transition:'width .2s',flexShrink:0,overflow:'hidden'}},
+      h('div',{style:{display:'flex',alignItems:'center',gap:'.75rem',padding:'1rem',borderBottom:'1px solid rgba(255,255,255,.15)',minHeight:'4rem'}},
+        h('img',{src:'/static/logo.png',alt:'logo',style:{height:'2rem',width:'2rem',borderRadius:'.375rem',flexShrink:0,objectFit:'cover'}}),
+        !collapsed && h('span',{style:{color:'#fff',fontWeight:700,fontSize:'.9rem',whiteSpace:'nowrap'}},'Sales Buddy 3.0')
+      ),
+      h('nav',{style:{flex:1,overflowY:'auto',padding:'.75rem .5rem',display:'flex',flexDirection:'column',gap:'.125rem'}},
+        visible.map(n=>h('button',{key:n.path,className:`sidebar-link${route===n.path?' active':''}`,onClick:()=>navigate(n.path)},
+          Icon(n.icon, 18, {flexShrink:0}),
+          !collapsed && h('span',{style:{whiteSpace:'nowrap'}},n.label)
+        ))
+      ),
+      h('div',{style:{padding:'.75rem .5rem',borderTop:'1px solid rgba(255,255,255,.15)',display:'flex',flexDirection:'column',gap:'.125rem'}},
+        h('button',{className:`sidebar-link${route==='/profile'?' active':''}`,onClick:()=>navigate('/profile')},
+          Icon('settings',18,{flexShrink:0}), !collapsed&&h('span',null,'Profile')
+        ),
+        h('button',{className:'sidebar-link',onClick:()=>{logout();navigate('/login');}},
+          Icon('log-out',18,{flexShrink:0}), !collapsed&&h('span',null,'Logout')
+        )
+      )
+    ),
+    h('div',{style:{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}},
+      h('header',{style:{background:'#fff',borderBottom:'1px solid #e9d5ff',padding:'.75rem 1.5rem',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}},
+        h('button',{onClick:()=>setCollapsed(!collapsed),style:{background:'none',border:'none',cursor:'pointer',color:'#64748b',fontSize:'1.25rem',padding:'.25rem'}},'☰'),
+        h('div',{style:{display:'flex',alignItems:'center',gap:'.75rem'}},
+          h('div',{style:{textAlign:'right'}},
+            h('div',{style:{fontSize:'.875rem',fontWeight:600,color:'#1a0030'}},user?.full_name),
+            h('div',{style:{fontSize:'.75rem',color:'#6b21a8'}},user?.role+' · '+user?.agency)
+          ),
+          h('div',{style:{width:'2.5rem',height:'2.5rem',borderRadius:'50%',background:'#4B006E',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:'.875rem'}},user?.full_name?.charAt(0)||'U')
+        )
+      ),
+      h('main',{style:{flex:1,overflowY:'auto',padding:'1.5rem'}},page)
+    )
+  );
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────────
+function Dashboard() {
+  const {user,apiFetch} = useAuth();
+  const [data,setData] = useState(null);
+  const [loading,setLoading] = useState(true);
+  useEffect(()=>{ apiFetch('/reports/dashboard').then(setData).catch(console.error).finally(()=>setLoading(false)); },[]);
+  if (loading) return h('div',{style:{textAlign:'center',padding:'4rem',color:'#94a3b8'}},'Loading dashboard...');
+  const actStats = data?.activity_stats||[];
+  const doneCount = actStats.find(a=>a.activity_status==='Done')?.count||0;
+  const pendingCount = actStats.find(a=>a.activity_status==='Pending')?.count||0;
+  const totalAct = actStats.reduce((s,a)=>s+a.count,0);
+  const custStats = data?.customer_stats||[];
+  const barData = custStats.map(c=>({name:c.loan_type,count:c.count}));
+  const pieData = actStats.map(a=>({name:a.activity_status,value:a.count}));
+  const SC = ({icon,label,value,sub,bg='#ede9fe'}) => h('div',{className:'card',style:{display:'flex',alignItems:'center',gap:'1rem'}},
+    h('div',{style:{width:'3rem',height:'3rem',borderRadius:'.75rem',background:bg,display:'flex',alignItems:'center',justifyContent:'center',color:'#4B006E'}},Icon(icon,22)),
+    h('div',null,
+      h('div',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a'}},value),
+      h('div',{style:{fontSize:'.875rem',color:'#475569'}},label),
+      sub&&h('div',{style:{fontSize:'.75rem',color:'#94a3b8'}},sub)
+    )
+  );
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.5rem'}},
+    h('div',null,
+      h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'.25rem'}},'Welcome, '+(user?.full_name?.split(' ')[0]||'')+'!'),
+      h('p',{style:{color:'#64748b',fontSize:'.875rem'}},user?.role+' · '+user?.agency+' · '+user?.region_name)
+    ),
+    h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'1rem'}},
+      h(SC,{icon:'users',label:'Total Customers',value:data?.total_customers||0,bg:'#ede9fe'}),
+      h(SC,{icon:'circle-check-big',label:'Activities Done',value:doneCount,sub:`of ${totalAct} total`,bg:'#ede9fe'}),
+      h(SC,{icon:'clock',label:'Pending Activities',value:pendingCount,bg:'#ede9fe'}),
+      h(SC,{icon:'banknote',label:'Total LR',value:`₱${((data?.lr_total||0)/1000000).toFixed(2)}M`,bg:'#ede9fe'})
+    ),
+    h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.5rem'}},
+      h('div',{className:'card'},
+        h('h2',{style:{fontSize:'.9375rem',fontWeight:600,color:'#374151',marginBottom:'1rem'}},'Activity Status'),
+        pieData.length>0
+          ? h(ResponsiveContainer,{width:'100%',height:200},
+              h(PieChart,null,
+                h(Pie,{data:pieData,cx:'50%',cy:'50%',innerRadius:55,outerRadius:85,dataKey:'value',label:true},
+                  pieData.map((_,i)=>h(Cell,{key:i,fill:COLORS[i%COLORS.length]}))
+                ),
+                h(Legend,null), h(Tooltip,null)
+              )
+            )
+          : h('div',{style:{height:'12rem',display:'flex',alignItems:'center',justifyContent:'center',color:'#94a3b8',fontSize:'.875rem'}},'No activity data')
+      ),
+      h('div',{className:'card'},
+        h('h2',{style:{fontSize:'.9375rem',fontWeight:600,color:'#374151',marginBottom:'1rem'}},'Customers by Loan Type'),
+        h(ResponsiveContainer,{width:'100%',height:200},
+          h(BarChart,{data:barData},
+            h(XAxis,{dataKey:'name',tick:{fontSize:12}}), h(YAxis,null), h(Tooltip,null),
+            h(Bar,{dataKey:'count',fill:'#3b82f6',radius:[4,4,0,0]})
+          )
+        )
+      )
+    ),
+    h('div',{className:'card'},
+      h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'1rem'}},
+        h('h2',{style:{fontSize:'.9375rem',fontWeight:600,color:'#374151'}},'Recent Activities'),
+        h('button',{className:'btn btn-secondary',style:{fontSize:'.75rem',padding:'.375rem .75rem'},onClick:()=>navigate('/activities')},'View all →')
+      ),
+      data?.recent_activities?.length>0
+        ? h('div',{style:{overflowX:'auto'}},
+            h('table',{className:'tbl'},
+              h('thead',null,h('tr',null,['Customer','Type','Loan Status','Activity Status','Date'].map(c=>h('th',{key:c},c)))),
+              h('tbody',null, data.recent_activities.map(a=>h('tr',{key:a.id},
+                h('td',{style:{fontWeight:500}},a.client_name||a.customer_name),
+                h('td',{style:{color:'#64748b'}},a.activity_type),
+                h('td',{style:{color:'#64748b',fontSize:'.8125rem'}},a.loan_status),
+                h('td',null,h(StatusBadge,{status:a.activity_status})),
+                h('td',{style:{color:'#94a3b8',fontSize:'.8125rem'}},a.created_at?.slice(0,10))
+              )))
+            )
+          )
+        : h('p',{style:{color:'#94a3b8',fontSize:'.875rem'}},'No recent activities.')
+    )
+  );
+}
+
+// ── Customers ──────────────────────────────────────────────────────────────────
+function Customers() {
+  const {user,apiFetch} = useAuth();
+  const [customers,setCustomers] = useState([]);
+  const [promos,setPromos] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [showModal,setShowModal] = useState(false);
+  const [search,setSearch] = useState('');
+  const [filterLoan,setFilterLoan] = useState('');
+  const initForm = {loan_type:'New Loan',agency:user?.agency||'DEPED',product:'',promo_id:'',client_name:'',date_added:new Date().toISOString().slice(0,10),school:'',location:'',employee_number:'',mobile_number:'',customer_email:'',loan_amount:''};
+  const [form,setForm] = useState(initForm);
+  const sf = k => v => setForm(f=>({...f,[k]:v}));
+  const PRODS = {DEPED:['01.01 DEPED','01.02 DEPED CALAMITY','02 NEWLY HIRED TEACHERS','03 DEPED SPECIAL'],BEYOND_DEPED:['SUC','LGU','GOCCs','Other Government'],PENSION:['Pension','GSIS','SSS','AFP']};
+  const load = () => { const p=filterLoan?`?loan_type=${filterLoan}`:''; apiFetch('/customers'+p).then(setCustomers).catch(console.error).finally(()=>setLoading(false)); };
+  useEffect(load,[filterLoan]);
+  useEffect(()=>{ apiFetch(`/promos?active_only=true&agency=${form.agency}`).then(setPromos).catch(()=>{}); },[form.agency]);
+  const submit = async e => {
+    e.preventDefault();
+    try { await apiFetch('/customers',{method:'POST',body:JSON.stringify(form)}); toast.success('Customer registered!'); setShowModal(false); setForm(initForm); load(); }
+    catch(err) { toast.error(err?.response?.data?.error||'Failed'); }
+  };
+  const filtered = customers.filter(c=>c.client_name?.toLowerCase().includes(search.toLowerCase())||c.customer_id?.toLowerCase().includes(search.toLowerCase())||c.mobile_number?.includes(search));
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem'}},
+    h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
+      h('div',null,h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'.25rem'}},'Customers'),h('p',{style:{color:'#64748b',fontSize:'.875rem'}},customers.length+' total')),
+      h('button',{className:'btn btn-primary',onClick:()=>setShowModal(true)},'+ Add Customer')
+    ),
+    h('div',{style:{display:'flex',gap:'.75rem',flexWrap:'wrap'}},
+      inp(search,setSearch,{placeholder:'Search name, ID, mobile...',style:{maxWidth:'280px'}}),
+      h('select',{className:'input',style:{maxWidth:'200px'},value:filterLoan,onChange:e=>setFilterLoan(e.target.value)},
+        h('option',{value:''},'All Loan Types'),h('option',null,'New Loan'),h('option',null,'Reloan')
+      )
+    ),
+    h('div',{className:'card',style:{padding:0,overflow:'auto'}},
+      h('table',{className:'tbl'},
+        h('thead',null,h('tr',null,['ID','Client Name','Agency','Loan Type','Product','Amount','Branch','Source','Contact','Date',''].map(c=>h('th',{key:c},c)))),
+        h('tbody',null,
+          loading ? h('tr',null,h('td',{colSpan:11,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'Loading...'))
+          : filtered.length===0 ? h('tr',null,h('td',{colSpan:11,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'No customers found'))
+          : filtered.map(c=>h('tr',{key:c.id},
+            h('td',{style:{fontFamily:'monospace',fontSize:'.8125rem',color:'#64748b'}},c.customer_id),
+            h('td',{style:{fontWeight:500}},c.client_name),
+            h('td',null,h('span',{className:'badge',style:{background:'#eff6ff',color:'#1d4ed8'}},c.agency)),
+            h('td',{style:{color:'#475569'}},c.loan_type),
+            h('td',{style:{color:'#64748b',fontSize:'.8125rem'}},c.product),
+            h('td',null,'₱'+Number(c.loan_amount||0).toLocaleString()),
+            h('td',{style:{color:'#64748b',fontSize:'.8125rem'}},c.branch_name),
+            h('td',null,h('span',{className:'badge',style:{background:c.source==='Manual'?'#f1f5f9':'#f0fdf4',color:c.source==='Manual'?'#475569':'#15803d'}},c.source)),
+            h('td',null,
+              c.mobile_number&&h('a',{href:'tel:'+c.mobile_number,style:{marginRight:'.5rem'}},'📞'),
+              c.customer_email&&h('a',{href:'mailto:'+c.customer_email},'✉️')
+            ),
+            h('td',{style:{color:'#94a3b8',fontSize:'.8125rem'}},c.date_added),
+            h('td',null,h('button',{style:{background:'none',border:'none',color:'#2563eb',cursor:'pointer',fontWeight:500,fontSize:'.8125rem'},onClick:()=>navigate('/customers/'+c.id)},'View →'))
+          ))
+        )
+      )
+    ),
+    h(Modal,{open:showModal,onClose:()=>setShowModal(false),title:'Register New Customer'},
+      h('form',{onSubmit:submit},
+        h('div',{className:'grid2'},
+          fld('Loan Type *',h('select',{className:'input',value:form.loan_type,onChange:e=>sf('loan_type')(e.target.value)},h('option',null,'New Loan'),h('option',null,'Reloan'))),
+          fld('Agency',inp(form.agency,()=>{},{readOnly:true,style:{background:'#f8fafc'}})),
+          fld('Product',h('select',{className:'input',value:form.product,onChange:e=>sf('product')(e.target.value)},
+            h('option',{value:''},'Select...'), (PRODS[form.agency]||[]).map(p=>h('option',{key:p},p))
+          )),
+          fld('Promo',h('select',{className:'input',value:form.promo_id,onChange:e=>sf('promo_id')(e.target.value)},
+            h('option',{value:''},'No promo'), promos.map(p=>h('option',{key:p.id,value:p.id},p.promo_name))
+          )),
+          h('div',{className:'span2'},fld('Client Full Name *',inp(form.client_name,sf('client_name'),{placeholder:'First Middle Last',required:true}))),
+          fld('Date Added *',inp(form.date_added,sf('date_added'),{type:'date',required:true})),
+          fld('Employee Number',inp(form.employee_number,sf('employee_number'))),
+          form.agency==='DEPED'&&h('div',{className:'span2'},fld('School',inp(form.school,sf('school')))),
+          h('div',{className:'span2'},fld('Location',inp(form.location,sf('location'),{placeholder:'City, Province'}))),
+          fld('Mobile',inp(form.mobile_number,sf('mobile_number'))),
+          fld('Email',inp(form.customer_email,sf('customer_email'),{type:'email'})),
+          h('div',{className:'span2'},fld('Loan Amount (₱)',inp(form.loan_amount,sf('loan_amount'),{type:'number'}))),
+          h('div',{className:'span2',style:{display:'flex',gap:'.75rem'}},
+            h('button',{className:'btn btn-primary',type:'submit',style:{flex:1}},'Save Customer'),
+            h('button',{className:'btn btn-secondary',type:'button',style:{flex:1},onClick:()=>setShowModal(false)},'Cancel')
+          )
+        )
+      )
+    )
+  );
+}
+
+// ── Customer Detail ────────────────────────────────────────────────────────────
+function CustomerDetail({id}) {
+  const {apiFetch} = useAuth();
+  const [customer,setCustomer] = useState(null);
+  const [loading,setLoading] = useState(true);
+  const [showAct,setShowAct] = useState(false);
+  const [actForm,setActForm] = useState({loan_status:'For Application',activity_type:'Visit',activity_status:'Pending',disbursal_date:'',duration:'',address:'',sales_notes:''});
+  const saf = k => v => setActForm(f=>({...f,[k]:v}));
+  const load = () => apiFetch(`/customers/${id}`).then(setCustomer).catch(console.error).finally(()=>setLoading(false));
+  useEffect(()=>{ load(); },[id]);
+  const submitAct = async e => {
+    e.preventDefault();
+    try { await apiFetch('/activities',{method:'POST',body:JSON.stringify({...actForm,customer_id:customer.id})}); toast.success('Activity saved!'); setShowAct(false); load(); }
+    catch(err) { toast.error(err?.response?.data?.error||'Failed'); }
+  };
+  if (loading) return h('div',{style:{textAlign:'center',padding:'4rem',color:'#94a3b8'}},'Loading...');
+  if (!customer) return h('div',{style:{textAlign:'center',padding:'4rem',color:'#94a3b8'}},'Customer not found');
+  const LOAN_ST = ['For Application','Not Interested','Pending Approval','Released'];
+  const ACT_TY = ['Call','Message','Email','Online Meeting','Event','Visit'];
+  const ACT_ST = ['Call Again','Pending','Done'];
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem',maxWidth:'56rem'}},
+    h('div',{style:{display:'flex',alignItems:'center',gap:'.5rem',fontSize:'.875rem',color:'#64748b'}},
+      h('button',{style:{background:'none',border:'none',color:'#2563eb',cursor:'pointer',fontSize:'.875rem'},onClick:()=>navigate('/customers')},'← Customers'),
+      h('span',null,'/'),h('span',null,customer.client_name)
+    ),
+    h('div',{className:'card'},
+      h('div',{style:{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'1.25rem'}},
+        h('div',null,
+          h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'.25rem'}},customer.client_name),
+          h('p',{style:{fontFamily:'monospace',fontSize:'.8125rem',color:'#64748b'}},customer.customer_id)
+        ),
+        h('div',{style:{display:'flex',gap:'.5rem',flexWrap:'wrap'}},
+          customer.priority&&h('span',{className:'badge',style:{background:'#fee2e2',color:'#991b1b'}},customer.priority),
+          h('span',{className:'badge',style:{background:'#eff6ff',color:'#1d4ed8'}},customer.agency),
+          h('span',{className:'badge',style:{background:'#f1f5f9',color:'#475569'}},customer.loan_type)
+        )
+      ),
+      h('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'1rem',fontSize:'.875rem'}},
+        [['Product',customer.product],['Loan Amount','₱'+Number(customer.loan_amount||0).toLocaleString()],['Branch',customer.branch_name],['Region',customer.region_name],['School',customer.school||'—'],['Location',customer.location||'—'],['Employee No.',customer.employee_number||'—'],['Mobile',customer.mobile_number||'—'],['Email',customer.customer_email||'—'],['Date Added',customer.date_added],['Source',customer.source],['Assigned SA',customer.sa_name||'—']].map(([k,v])=>
+          h('div',{key:k},
+            h('div',{style:{fontSize:'.75rem',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:'.125rem'}},k),
+            h('div',{style:{fontWeight:500,color:'#374151'}},v)
+          )
+        )
+      ),
+      h('div',{style:{display:'flex',gap:'.75rem',marginTop:'1.25rem',paddingTop:'1rem',borderTop:'1px solid #f1f5f9'}},
+        customer.mobile_number&&h('a',{href:'tel:'+customer.mobile_number,className:'btn btn-secondary'},'📞 Call'),
+        customer.customer_email&&h('a',{href:'mailto:'+customer.customer_email,className:'btn btn-secondary'},'✉️ Email'),
+        h('button',{className:'btn btn-primary',onClick:()=>setShowAct(true)},'+ Add Activity')
+      )
+    ),
+    h('div',{className:'card'},
+      h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'1rem'}},
+        h('h2',{style:{fontSize:'.9375rem',fontWeight:600,color:'#374151'}},'Related Activities ('+(customer.activities?.length||0)+')'),
+        h('button',{className:'btn btn-secondary',style:{fontSize:'.8125rem',padding:'.375rem .75rem'},onClick:()=>setShowAct(true)},'+ Add')
+      ),
+      customer.activities?.length>0
+        ? h('div',{style:{overflowX:'auto'}},
+            h('table',{className:'tbl'},
+              h('thead',null,h('tr',null,['ID','Type','Loan Status','Status','Duration','Notes','Date'].map(c=>h('th',{key:c},c)))),
+              h('tbody',null,customer.activities.map(a=>h('tr',{key:a.id},
+                h('td',{style:{fontFamily:'monospace',fontSize:'.8125rem',color:'#64748b'}},a.activity_id),
+                h('td',null,a.activity_type),
+                h('td',{style:{color:'#64748b',fontSize:'.8125rem'}},a.loan_status),
+                h('td',null,h(StatusBadge,{status:a.activity_status})),
+                h('td',{style:{color:'#94a3b8'}},a.duration),
+                h('td',{style:{color:'#64748b',maxWidth:'200px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:'.8125rem'}},a.sales_notes),
+                h('td',{style:{color:'#94a3b8',fontSize:'.8125rem'}},a.created_at?.slice(0,10))
+              )))
+            )
+          )
+        : h('p',{style:{color:'#94a3b8',fontSize:'.875rem'}},'No activities yet.')
+    ),
+    h(Modal,{open:showAct,onClose:()=>setShowAct(false),title:'Add Activity'},
+      h('form',{onSubmit:submitAct},
+        h('div',{className:'grid2'},
+          fld('Activity Type *',h('select',{className:'input',value:actForm.activity_type,onChange:e=>saf('activity_type')(e.target.value)},ACT_TY.map(t=>h('option',{key:t},t)))),
+          fld('Activity Status *',h('select',{className:'input',value:actForm.activity_status,onChange:e=>saf('activity_status')(e.target.value)},ACT_ST.map(s=>h('option',{key:s},s)))),
+          h('div',{className:'span2'},fld('Loan Status *',h('select',{className:'input',value:actForm.loan_status,onChange:e=>saf('loan_status')(e.target.value)},LOAN_ST.map(s=>h('option',{key:s},s))))),
+          actForm.loan_status==='Released'&&h('div',{className:'span2'},fld('Disbursal Date',inp(actForm.disbursal_date,saf('disbursal_date'),{type:'date'}))),
+          fld('Duration',inp(actForm.duration,saf('duration'),{placeholder:'30 mins'})),
+          fld('Address',inp(actForm.address,saf('address'))),
+          h('div',{className:'span2'},fld('Sales Notes',h('textarea',{className:'input',rows:3,value:actForm.sales_notes,onChange:e=>saf('sales_notes')(e.target.value)}))),
+          h('div',{className:'span2',style:{display:'flex',gap:'.75rem'}},
+            h('button',{className:'btn btn-primary',type:'submit',style:{flex:1}},'Save Activity'),
+            h('button',{className:'btn btn-secondary',type:'button',style:{flex:1},onClick:()=>setShowAct(false)},'Cancel')
+          )
+        )
+      )
+    )
+  );
+}
+
+// ── Activities ─────────────────────────────────────────────────────────────────
+function Activities() {
+  const {user,apiFetch} = useAuth();
+  const [acts,setActs] = useState([]);
+  const [custs,setCusts] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [showModal,setShowModal] = useState(false);
+  const [editAct,setEditAct] = useState(null);
+  const [filterStatus,setFilterStatus] = useState('');
+  const initForm = {customer_id:'',loan_status:'For Application',activity_type:'Visit',activity_status:'Pending',disbursal_date:'',duration:'',address:'',sales_notes:''};
+  const [form,setForm] = useState(initForm);
+  const sf = k => v => setForm(f=>({...f,[k]:v}));
+  const load = () => { const p=filterStatus?`?status=${filterStatus}`:''; apiFetch('/activities'+p).then(setActs).catch(console.error).finally(()=>setLoading(false)); };
+  useEffect(load,[filterStatus]);
+  useEffect(()=>{ apiFetch('/customers').then(setCusts).catch(()=>{}); },[]);
+  const openNew = () => { setEditAct(null); setForm(initForm); setShowModal(true); };
+  const openEdit = a => { setEditAct(a); setForm({customer_id:a.customer_id||'',loan_status:a.loan_status,activity_type:a.activity_type,activity_status:a.activity_status,disbursal_date:a.disbursal_date||'',duration:a.duration||'',address:a.address||'',sales_notes:a.sales_notes||''}); setShowModal(true); };
+  const submit = async e => {
+    e.preventDefault();
+    try {
+      if(editAct) { await apiFetch(`/activities/${editAct.id}`,{method:'PUT',body:JSON.stringify(form)}); toast.success('Updated!'); }
+      else { await apiFetch('/activities',{method:'POST',body:JSON.stringify(form)}); toast.success('Created!'); }
+      setShowModal(false); load();
+    } catch(err) { toast.error(err?.response?.data?.error||'Failed'); }
+  };
+  const del = async id => { if(!confirm('Delete?')) return; try { await apiFetch(`/activities/${id}`,{method:'DELETE'}); toast.success('Deleted'); load(); } catch { toast.error('Delete failed'); } };
+  const LOAN_ST=['For Application','Not Interested','Pending Approval','Released'];
+  const ACT_TY=['Call','Message','Email','Online Meeting','Event','Visit'];
+  const ACT_ST=['Call Again','Pending','Done'];
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem'}},
+    h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
+      h('div',null,h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'.25rem'}},'Activities'),h('p',{style:{color:'#64748b',fontSize:'.875rem'}},acts.length+' activities')),
+      h('button',{className:'btn btn-primary',onClick:openNew},'+ Add Activity')
+    ),
+    h('select',{className:'input',style:{maxWidth:'220px'},value:filterStatus,onChange:e=>setFilterStatus(e.target.value)},
+      h('option',{value:''},'All Statuses'), ACT_ST.map(s=>h('option',{key:s},s))
+    ),
+    h('div',{className:'card',style:{padding:0,overflow:'auto'}},
+      h('table',{className:'tbl'},
+        h('thead',null,h('tr',null,['ID','Customer','Type','Loan Status','Status','Duration','Notes','SA','Date','Actions'].map(c=>h('th',{key:c},c)))),
+        h('tbody',null,
+          loading?h('tr',null,h('td',{colSpan:10,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'Loading...'))
+          :acts.length===0?h('tr',null,h('td',{colSpan:10,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'No activities found'))
+          :acts.map(a=>h('tr',{key:a.id},
+            h('td',{style:{fontFamily:'monospace',fontSize:'.8125rem',color:'#64748b'}},a.activity_id),
+            h('td',{style:{fontWeight:500}},a.client_name||a.customer_name),
+            h('td',{style:{color:'#475569'}},a.activity_type),
+            h('td',{style:{color:'#64748b',fontSize:'.8125rem'}},a.loan_status),
+            h('td',null,h(StatusBadge,{status:a.activity_status})),
+            h('td',{style:{color:'#94a3b8'}},a.duration),
+            h('td',{style:{color:'#64748b',fontSize:'.8125rem',maxWidth:'150px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},a.sales_notes),
+            h('td',{style:{color:'#94a3b8',fontSize:'.8125rem'}},a.sa_name),
+            h('td',{style:{color:'#94a3b8',fontSize:'.8125rem'}},a.created_at?.slice(0,10)),
+            h('td',null,h('div',{style:{display:'flex',gap:'.5rem'}},
+              h('button',{style:{background:'none',border:'none',color:'#2563eb',cursor:'pointer',fontSize:'.8125rem',fontWeight:500},onClick:()=>openEdit(a)},'Edit'),
+              user?.role==='SA'&&h('button',{style:{background:'none',border:'none',color:'#dc2626',cursor:'pointer',fontSize:'.8125rem',fontWeight:500},onClick:()=>del(a.id)},'Del')
+            ))
+          ))
+        )
+      )
+    ),
+    h(Modal,{open:showModal,onClose:()=>setShowModal(false),title:editAct?'Edit Activity':'New Activity'},
+      h('form',{onSubmit:submit},
+        h('div',{className:'grid2'},
+          !editAct&&h('div',{className:'span2'},fld('Customer *',h('select',{className:'input',value:form.customer_id,onChange:e=>sf('customer_id')(e.target.value),required:true},
+            h('option',{value:''},'Select customer...'), custs.map(c=>h('option',{key:c.id,value:c.id},c.client_name+' ('+c.customer_id+')'))
+          ))),
+          fld('Activity Type *',h('select',{className:'input',value:form.activity_type,onChange:e=>sf('activity_type')(e.target.value)},ACT_TY.map(t=>h('option',{key:t},t)))),
+          fld('Activity Status *',h('select',{className:'input',value:form.activity_status,onChange:e=>sf('activity_status')(e.target.value)},ACT_ST.map(s=>h('option',{key:s},s)))),
+          h('div',{className:'span2'},fld('Loan Status *',h('select',{className:'input',value:form.loan_status,onChange:e=>sf('loan_status')(e.target.value)},LOAN_ST.map(s=>h('option',{key:s},s))))),
+          form.loan_status==='Released'&&h('div',{className:'span2'},fld('Disbursal Date',inp(form.disbursal_date,sf('disbursal_date'),{type:'date'}))),
+          fld('Duration',inp(form.duration,sf('duration'),{placeholder:'30 mins'})),
+          fld('Address',inp(form.address,sf('address'))),
+          h('div',{className:'span2'},fld('Sales Notes',h('textarea',{className:'input',rows:3,value:form.sales_notes,onChange:e=>sf('sales_notes')(e.target.value)}))),
+          h('div',{className:'span2',style:{display:'flex',gap:'.75rem'}},
+            h('button',{className:'btn btn-primary',type:'submit',style:{flex:1}},editAct?'Update':'Save'),
+            h('button',{className:'btn btn-secondary',type:'button',style:{flex:1},onClick:()=>setShowModal(false)},'Cancel')
+          )
+        )
+      )
+    )
+  );
+}
+
+// ── Calendar ───────────────────────────────────────────────────────────────────
+function ActivityCalendar() {
+  const {apiFetch} = useAuth();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const [year,setYear] = useState(today.getFullYear());
+  const [month,setMonth] = useState(today.getMonth());
+  const [acts,setActs] = useState([]);
+  const [sel,setSel] = useState(null);
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  useEffect(()=>{ apiFetch('/activities').then(setActs).catch(()=>{}); },[]);
+  const byDay = {};
+  acts.forEach(a=>{ const d=a.created_at?.slice(0,10); if(d){if(!byDay[d])byDay[d]=[];byDay[d].push(a);} });
+  const getDays=(y,m)=>{ const first=new Date(y,m,1),last=new Date(y,m+1,0),days=[]; for(let i=0;i<first.getDay();i++)days.push(null); for(let d=1;d<=last.getDate();d++)days.push(d); return days; };
+  const days = getDays(year,month);
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem'}},
+    h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a'}},'Activity Calendar'),
+    h('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:'1.5rem'}},
+      h('div',{className:'card'},
+        h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'1.25rem'}},
+          h('button',{className:'btn btn-secondary',style:{padding:'.375rem .75rem'},onClick:()=>{if(month===0){setYear(y=>y-1);setMonth(11);}else setMonth(m=>m-1);}},'\u2190'),
+          h('h2',{style:{fontSize:'1.125rem',fontWeight:600}},MN[month]+' '+year),
+          h('button',{className:'btn btn-secondary',style:{padding:'.375rem .75rem'},onClick:()=>{if(month===11){setYear(y=>y+1);setMonth(0);}else setMonth(m=>m+1);}},'\u2192')
+        ),
+        h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px',marginBottom:'.5rem'}},
+          DN.map(d=>h('div',{key:d,style:{textAlign:'center',fontSize:'.75rem',fontWeight:600,color:'#94a3b8',padding:'.25rem'}},d))
+        ),
+        h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px'}},
+          days.map((day,i)=>{
+            if(!day) return h('div',{key:i});
+            const dStr=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const hasActs=byDay[dStr]?.length>0;
+            const isToday=dStr===todayStr, isSel=dStr===sel;
+            return h('button',{key:i,onClick:()=>setSel(dStr),style:{position:'relative',padding:'.5rem',borderRadius:'.5rem',fontSize:'.875rem',fontWeight:500,cursor:'pointer',border:'none',background:isSel?'#2563eb':isToday?'#eff6ff':'transparent',color:isSel?'#fff':isToday?'#1d4ed8':'#374151',textAlign:'center'}},
+              day,
+              hasActs&&h('span',{style:{position:'absolute',bottom:'2px',right:'3px',width:'6px',height:'6px',borderRadius:'50%',background:isSel?'#fff':'#3b82f6'}})
+            );
+          })
+        )
+      ),
+      h('div',{className:'card'},
+        h('h3',{style:{fontSize:'.9375rem',fontWeight:600,color:'#374151',marginBottom:'.75rem'}},sel?'Activities on '+sel:'Select a date'),
+        !sel ? h('p',{style:{color:'#94a3b8',fontSize:'.875rem'}},'Click a date to see activities.')
+        :(byDay[sel]||[]).length===0 ? h('p',{style:{color:'#94a3b8',fontSize:'.875rem'}},'No activities on this day.')
+        :(byDay[sel]).map(a=>h('div',{key:a.id,style:{padding:'.75rem',background:'#f8fafc',borderRadius:'.625rem',marginBottom:'.5rem',fontSize:'.875rem'}},
+          h('div',{style:{fontWeight:500,color:'#0f172a'}},a.client_name||a.customer_name),
+          h('div',{style:{fontSize:'.8125rem',color:'#64748b'}},a.activity_type+' · '+a.activity_status),
+          a.sales_notes&&h('div',{style:{fontSize:'.8125rem',color:'#94a3b8',marginTop:'.25rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},a.sales_notes)
+        ))
+      )
+    )
+  );
+}
+
+// ── Targets ────────────────────────────────────────────────────────────────────
+function Targets() {
+  const {user,apiFetch} = useAuth();
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [targets,setTargets] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [fAgency,setFAgency] = useState(user?.role==='Admin'?'':(user?.agency||'DEPED'));
+  const [fMonth,setFMonth] = useState(new Date().getMonth()+1);
+  const [fYear,setFYear] = useState(new Date().getFullYear());
+  const [showModal,setShowModal] = useState(false);
+  const initForm = {region_product_group:'',agency:'DEPED',month:new Date().getMonth()+1,year:new Date().getFullYear(),target_amount:'',actual_lr_mtd:'',actual_lr_ytd:'',actual_lp:'',target_lp:'',lr_stretch_target:'',total_new_loan:'',total_reloan:'',target_new_money:'',actual_new_money:''};
+  const [form,setForm] = useState(initForm);
+  const sf = k => v => setForm(f=>({...f,[k]:v}));
+  const load = () => { let p=`?month=${fMonth}&year=${fYear}`; if(fAgency) p+=`&agency=${fAgency}`; apiFetch('/targets'+p).then(setTargets).catch(console.error).finally(()=>setLoading(false)); };
+  useEffect(load,[fAgency,fMonth,fYear]);
+  const submit = async e => {
+    e.preventDefault();
+    try { await apiFetch('/targets',{method:'POST',body:JSON.stringify(form)}); toast.success('Saved!'); setShowModal(false); load(); }
+    catch(err) { toast.error(err?.response?.data?.error||'Failed'); }
+  };
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem'}},
+    h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
+      h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a'}},'Targets Tracking'),
+      ['Admin','SH'].includes(user?.role)&&h('button',{className:'btn btn-primary',onClick:()=>{setForm(initForm);setShowModal(true);}},'+ Add/Update')
+    ),
+    h('div',{style:{display:'flex',gap:'.75rem',flexWrap:'wrap'}},
+      user?.role==='Admin'&&h('select',{className:'input',style:{maxWidth:'200px'},value:fAgency,onChange:e=>setFAgency(e.target.value)},
+        h('option',{value:''},'All Agencies'), ['DEPED','BEYOND_DEPED','PENSION'].map(a=>h('option',{key:a},a))
+      ),
+      h('select',{className:'input',style:{width:'9rem'},value:fMonth,onChange:e=>setFMonth(Number(e.target.value))},
+        MN.map((m,i)=>h('option',{key:i,value:i+1},m))
+      ),
+      h('input',{type:'number',className:'input',style:{width:'7rem'},value:fYear,onChange:e=>setFYear(Number(e.target.value)),min:2020,max:2030})
+    ),
+    targets.length>0&&h('div',{className:'card'},
+      h('h2',{style:{fontSize:'.9375rem',fontWeight:600,color:'#374151',marginBottom:'1rem'}},'Target vs Actual LR (MTD)'),
+      h(ResponsiveContainer,{width:'100%',height:200},
+        h(BarChart,{data:targets.map(t=>({name:t.region_product_group,Target:t.target_amount,Actual:t.actual_lr_mtd}))},
+          h(XAxis,{dataKey:'name',tick:{fontSize:11}}), h(YAxis,{tickFormatter:v=>`₱${(v/1000000).toFixed(1)}M`,width:70}),
+          h(Tooltip,{formatter:v=>`₱${Number(v).toLocaleString()}`}),
+          h(Bar,{dataKey:'Target',fill:'#cbd5e1',radius:[4,4,0,0]}), h(Bar,{dataKey:'Actual',fill:'#3b82f6',radius:[4,4,0,0]})
+        )
+      )
+    ),
+    h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:'1rem'}},
+      loading?h('div',{style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'Loading...')
+      :targets.length===0?h('div',{style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'No target data for this period.')
+      :targets.map(t=>h('div',{key:t.id,className:'card'},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1rem'}},
+          h('div',null,h('div',{style:{fontWeight:600,color:'#0f172a'}},t.region_product_group),h('div',{style:{fontSize:'.75rem',color:'#94a3b8'}},t.agency+' · '+MN[t.month-1]+' '+t.year)),
+          h('div',{style:{textAlign:'right',fontSize:'.75rem',color:'#64748b'}},h('div',null,'New: '+t.total_new_loan),h('div',null,'Reloan: '+t.total_reloan))
+        ),
+        h(Gauge,{label:'LR MTD Attainment',val:t.actual_lr_mtd,max:t.target_amount}),
+        h(Gauge,{label:'New Money Attainment',val:t.actual_new_money,max:t.target_new_money}),
+        h('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'.75rem',paddingTop:'.75rem',borderTop:'1px solid #f1f5f9',textAlign:'center',fontSize:'.8125rem'}},
+          [['MTD Att.',t.mtd_attainment],['LP Att.',t.lp_attainment],['Stretch',t.stretch_attainment]].map(([k,v])=>
+            h('div',{key:k},h('div',{style:{fontWeight:600,color:'#374151'}},Number(v||0).toFixed(1)+'%'),h('div',{style:{color:'#94a3b8',fontSize:'.75rem'}},k))
+          )
+        )
+      ))
+    ),
+    h(Modal,{open:showModal,onClose:()=>setShowModal(false),title:'Add / Update Target'},
+      h('form',{onSubmit:submit},
+        h('div',{className:'grid2'},
+          h('div',{className:'span2'},fld('Region / Product Group *',inp(form.region_product_group,sf('region_product_group'),{required:true}))),
+          fld('Agency',h('select',{className:'input',value:form.agency,onChange:e=>sf('agency')(e.target.value)},['DEPED','BEYOND_DEPED','PENSION'].map(a=>h('option',{key:a},a)))),
+          fld('Month',h('select',{className:'input',value:form.month,onChange:e=>sf('month')(Number(e.target.value))},MN.map((m,i)=>h('option',{key:i,value:i+1},m)))),
+          fld('Year',inp(form.year,v=>sf('year')(Number(v)),{type:'number'})),
+          ...['target_amount','actual_lr_mtd','actual_lr_ytd','target_new_money','actual_new_money','total_new_loan','total_reloan'].map(k=>fld(k.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),inp(form[k],sf(k),{type:'number'}))),
+          h('div',{className:'span2',style:{display:'flex',gap:'.75rem'}},
+            h('button',{className:'btn btn-primary',type:'submit',style:{flex:1}},'Save'),
+            h('button',{className:'btn btn-secondary',type:'button',style:{flex:1},onClick:()=>setShowModal(false)},'Cancel')
+          )
+        )
+      )
+    )
+  );
+}
+
+// ── Target Shares ──────────────────────────────────────────────────────────────
+function TargetShares() {
+  const {user,apiFetch} = useAuth();
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [shares,setShares] = useState([]);
+  const [saList,setSaList] = useState([]);
+  const [audit,setAudit] = useState([]);
+  const [showModal,setShowModal] = useState(false);
+  const [showAudit,setShowAudit] = useState(false);
+  const [form,setForm] = useState({sa_id:'',agency:user?.agency||'DEPED',month:new Date().getMonth()+1,year:new Date().getFullYear(),target_amount:''});
+  const sf = k => v => setForm(f=>({...f,[k]:v}));
+  const load = () => apiFetch('/targets/shares').then(setShares).catch(console.error);
+  useEffect(()=>{ load(); apiFetch('/reports/sa-list').then(setSaList).catch(()=>{}); },[]);
+  const submit = async e => {
+    e.preventDefault();
+    try { await apiFetch('/targets/shares',{method:'POST',body:JSON.stringify(form)}); toast.success('Target share saved!'); setShowModal(false); load(); }
+    catch(err) { toast.error(err?.response?.data?.error||'Failed'); }
+  };
+  const openAudit = sa_id => { apiFetch(`/reports/target-audit/${sa_id}`).then(setAudit).catch(()=>setAudit([])); setShowAudit(true); };
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem'}},
+    h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
+      h('div',null,h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'.25rem'}},'Target Shares'),h('p',{style:{color:'#64748b',fontSize:'.875rem'}},'SA-level target assignments')),
+      ['ASH','RSH','SH','Admin'].includes(user?.role)&&h('button',{className:'btn btn-primary',onClick:()=>setShowModal(true)},'+ Assign Target')
+    ),
+    h('div',{className:'card',style:{padding:0,overflow:'auto'}},
+      h('table',{className:'tbl'},
+        h('thead',null,h('tr',null,['SA Name','Employee ID','Agency','Month/Year','Target Amount','Actual LR','Attainment','Audit'].map(c=>h('th',{key:c},c)))),
+        h('tbody',null,
+          shares.length===0?h('tr',null,h('td',{colSpan:8,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'No target shares assigned yet.'))
+          :shares.map(s=>h('tr',{key:s.id},
+            h('td',{style:{fontWeight:500}},s.full_name),
+            h('td',{style:{fontFamily:'monospace',fontSize:'.8125rem',color:'#64748b'}},s.employee_id),
+            h('td',null,h('span',{className:'badge',style:{background:'#eff6ff',color:'#1d4ed8'}},s.agency)),
+            h('td',{style:{color:'#475569'}},MN[s.month-1]+' '+s.year),
+            h('td',{style:{fontWeight:600}},'₱'+Number(s.target_amount||0).toLocaleString()),
+            h('td',{style:{color:'#475569'}},'₱'+Number(s.actual_lr||0).toLocaleString()),
+            h('td',null,h('div',{style:{display:'flex',alignItems:'center',gap:'.5rem'}},
+              h('div',{style:{flex:1,height:'8px',background:'#f1f5f9',borderRadius:'9999px',overflow:'hidden',minWidth:'60px'}},h('div',{style:{height:'100%',background:'#3b82f6',borderRadius:'9999px',width:`${Math.min(100,s.attainment||0)}%`}})),
+              h('span',{style:{fontSize:'.8125rem',fontWeight:600,color:'#374151'}},Number(s.attainment||0).toFixed(1)+'%')
+            )),
+            h('td',null,h('button',{style:{background:'none',border:'none',color:'#2563eb',cursor:'pointer',fontSize:'.8125rem',fontWeight:500},onClick:()=>openAudit(s.sa_id)},'Audit Trail'))
+          ))
+        )
+      )
+    ),
+    h(Modal,{open:showModal,onClose:()=>setShowModal(false),title:'Assign Target Share'},
+      h('form',{onSubmit:submit,style:{display:'flex',flexDirection:'column',gap:'.875rem'}},
+        fld('Sales Associate *',h('select',{className:'input',value:form.sa_id,onChange:e=>sf('sa_id')(e.target.value),required:true},
+          h('option',{value:''},'Select SA...'), saList.map(s=>h('option',{key:s.id,value:s.id},s.full_name+' ('+s.employee_id+')'))
+        )),
+        h('div',{className:'grid3'},
+          fld('Agency',h('select',{className:'input',value:form.agency,onChange:e=>sf('agency')(e.target.value)},['DEPED','BEYOND_DEPED','PENSION'].map(a=>h('option',{key:a},a)))),
+          fld('Month',h('select',{className:'input',value:form.month,onChange:e=>sf('month')(Number(e.target.value))},['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m,i)=>h('option',{key:i,value:i+1},m)))),
+          fld('Year',inp(form.year,v=>sf('year')(Number(v)),{type:'number'}))
+        ),
+        fld('Target Amount (₱) *',inp(form.target_amount,sf('target_amount'),{type:'number',required:true})),
+        h('div',{style:{display:'flex',gap:'.75rem'}},
+          h('button',{className:'btn btn-primary',type:'submit',style:{flex:1}},'Save'),
+          h('button',{className:'btn btn-secondary',type:'button',style:{flex:1},onClick:()=>setShowModal(false)},'Cancel')
+        )
+      )
+    ),
+    h(Modal,{open:showAudit,onClose:()=>setShowAudit(false),title:'Audit Trail'},
+      audit.length===0?h('p',{style:{color:'#94a3b8',fontSize:'.875rem'}},'No audit history.')
+      :h('div',null,audit.map(a=>h('div',{key:a.id,style:{padding:'.75rem',background:'#f8fafc',borderRadius:'.625rem',marginBottom:'.5rem',fontSize:'.875rem'}},
+        h('div',{style:{display:'flex',justifyContent:'space-between'}},h('span',{style:{fontWeight:500}},a.changed_by_name),h('span',{style:{fontSize:'.8125rem',color:'#94a3b8'}},a.changed_at?.slice(0,16))),
+        h('div',{style:{color:'#64748b',fontSize:'.8125rem',marginTop:'.25rem'}},'₱'+Number(a.old_target||0).toLocaleString()+' → ₱'+Number(a.new_target||0).toLocaleString())
+      )))
+    )
+  );
+}
+
+// ── Daily LR ───────────────────────────────────────────────────────────────────
+function DailyLR() {
+  const {apiFetch} = useAuth();
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [data,setData] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [fMonth,setFMonth] = useState('');
+  const [fYear,setFYear] = useState('');
+  useEffect(()=>{ let p=''; if(fMonth) p+=`?month=${fMonth}`; if(fYear) p+=(p?'&':'?')+`year=${fYear}`; apiFetch('/reports/daily-lr'+p).then(setData).catch(console.error).finally(()=>setLoading(false)); },[fMonth,fYear]);
+  const totalLR = data.reduce((s,d)=>s+(d.total_lr||0),0);
+  const totalCount = data.reduce((s,d)=>s+(d.count||0),0);
+  const chartData = [...new Map(data.map(d=>[d.disbursal_date,{date:d.disbursal_date,amount:data.filter(x=>x.disbursal_date===d.disbursal_date).reduce((s,x)=>s+x.total_lr,0)}])).values()].slice(0,30);
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem'}},
+    h('div',null,h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'.25rem'}},'Daily Loan Releases'),h('p',{style:{color:'#64748b',fontSize:'.875rem'}},'Disbursement records and analytics')),
+    h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',maxWidth:'40rem'}},
+      h('div',{className:'card',style:{display:'flex',alignItems:'center',gap:'1rem'}},h('div',{style:{width:'3rem',height:'3rem',borderRadius:'.75rem',background:'#ede9fe',display:'flex',alignItems:'center',justifyContent:'center',color:'#4B006E'}},Icon('banknote',22)),h('div',null,h('div',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a'}},'₱'+(totalLR/1000000).toFixed(2)+'M'),h('div',{style:{fontSize:'.875rem',color:'#475569'}},'Total LR Amount'))),
+      h('div',{className:'card',style:{display:'flex',alignItems:'center',gap:'1rem'}},h('div',{style:{width:'3rem',height:'3rem',borderRadius:'.75rem',background:'#ede9fe',display:'flex',alignItems:'center',justifyContent:'center',color:'#4B006E'}},Icon('bar-chart-2',22)),h('div',null,h('div',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a'}},totalCount),h('div',{style:{fontSize:'.875rem',color:'#475569'}},'Total Disbursements')))
+    ),
+    h('div',{style:{display:'flex',gap:'.75rem',flexWrap:'wrap'}},
+      h('select',{className:'input',style:{maxWidth:'180px'},value:fMonth,onChange:e=>setFMonth(e.target.value)},h('option',{value:''},'All Months'),MN.map((m,i)=>h('option',{key:i,value:i+1},m))),
+      h('input',{type:'number',className:'input',style:{width:'7rem'},placeholder:'Year',value:fYear,onChange:e=>setFYear(e.target.value)})
+    ),
+    chartData.length>0&&h('div',{className:'card'},
+      h('h2',{style:{fontSize:'.9375rem',fontWeight:600,color:'#374151',marginBottom:'1rem'}},'Daily LR Trend'),
+      h(ResponsiveContainer,{width:'100%',height:200},
+        h(BarChart,{data:chartData},h(XAxis,{dataKey:'date',tick:{fontSize:10}}),h(YAxis,{tickFormatter:v=>`₱${(v/1000).toFixed(0)}k`,width:70}),h(Tooltip,{formatter:v=>`₱${Number(v).toLocaleString()}`}),h(Bar,{dataKey:'amount',fill:'#3b82f6',radius:[4,4,0,0]}))
+      )
+    ),
+    h('div',{className:'card',style:{padding:0,overflow:'auto'}},
+      h('table',{className:'tbl'},
+        h('thead',null,h('tr',null,['Disbursal Date','Branch','Region','Count','Total LR'].map(c=>h('th',{key:c},c)))),
+        h('tbody',null,
+          loading?h('tr',null,h('td',{colSpan:5,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'Loading...'))
+          :data.length===0?h('tr',null,h('td',{colSpan:5,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'No data found'))
+          :data.map((d,i)=>h('tr',{key:i},h('td',{style:{fontFamily:'monospace',fontSize:'.8125rem'}},d.disbursal_date),h('td',null,d.branch_name),h('td',{style:{color:'#64748b'}},d.region),h('td',{style:{textAlign:'center'}},d.count),h('td',{style:{fontWeight:600,color:'#2563eb'}},'₱'+Number(d.total_lr||0).toLocaleString())))
+        )
+      )
+    )
+  );
+}
+
+// ── Assign ─────────────────────────────────────────────────────────────────────
+function Assign() {
+  const {apiFetch} = useAuth();
+  const [saList,setSaList] = useState([]);
+  const [selTable,setSelTable] = useState('lcs14');
+  const [records,setRecords] = useState([]);
+  const [loading,setLoading] = useState(false);
+  const [assignRec,setAssignRec] = useState(null);
+  const [aForm,setAForm] = useState({sa_id:'',priority:'P2'});
+  const TABLES=[{key:'lcs14',label:'LCS 14'},{key:'lcs18_pd_npl',label:'LCS 18 / PD_NPL'},{key:'deped_reloan',label:'DepEd Reloan'},{key:'deped_mob',label:'DepEd MOB'}];
+  const agencyMap={lcs14:'DEPED',lcs18_pd_npl:'DEPED',deped_reloan:'DEPED',deped_mob:'DEPED'};
+  useEffect(()=>{ apiFetch('/reports/sa-list').then(setSaList).catch(()=>{}); },[]);
+  useEffect(()=>{ setLoading(true); apiFetch(`/uploads/${selTable}`).then(setRecords).catch(()=>setRecords([])).finally(()=>setLoading(false)); },[selTable]);
+  const doAssign = async () => {
+    if(!aForm.sa_id||!assignRec) return;
+    try {
+      const cRes = await apiFetch('/customers',{method:'POST',body:JSON.stringify({loan_type:'Reloan',agency:agencyMap[selTable]||'DEPED',product:assignRec.product||assignRec.product_categ||'',client_name:assignRec.account_name,date_added:new Date().toISOString().slice(0,10),loan_amount:assignRec.loan_amount||0,source:selTable==='lcs14'?'LCS14':selTable==='lcs18_pd_npl'?'PD_NPL':selTable==='deped_reloan'?'DepEd_Leads':'MOB'})});
+      await apiFetch(`/customers/${cRes.id}/assign`,{method:'POST',body:JSON.stringify(aForm)});
+      toast.success('Customer assigned. Auto-tagged as Reloan.'); setAssignRec(null);
+    } catch(err) { toast.error(err?.response?.data?.error||'Failed'); }
+  };
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem'}},
+    h('div',null,h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'.25rem'}},'Assign Leads to SA'),h('p',{style:{color:'#64748b',fontSize:'.875rem'}},'Distribute leads from master lists')),
+    h('div',{className:'card',style:{background:'#eff6ff',borderColor:'#bfdbfe',padding:'1rem'}},h('div',{style:{display:'flex',gap:'.75rem'}},h('span',{style:{fontSize:'1.25rem'}},'ℹ️'),h('div',{style:{fontSize:'.875rem',color:'#1e3a8a'}},h('strong',null,'Smart Tagging: '),'All customers assigned here are automatically tagged as Reloan.'))),
+    h('div',{style:{display:'flex',gap:'.75rem',flexWrap:'wrap',alignItems:'center'}},
+      h('span',{style:{fontSize:'.875rem',fontWeight:500,color:'#374151'}},'Source:'),
+      TABLES.map(t=>h('button',{key:t.key,onClick:()=>setSelTable(t.key),style:{padding:'.5rem 1rem',borderRadius:'.5rem',fontSize:'.875rem',fontWeight:500,cursor:'pointer',border:`1px solid ${selTable===t.key?'#2563eb':'#cbd5e1'}`,background:selTable===t.key?'#2563eb':'#fff',color:selTable===t.key?'#fff':'#374151'}},t.label))
+    ),
+    h('div',{className:'card',style:{padding:0,overflow:'auto'}},
+      h('table',{className:'tbl'},
+        h('thead',null,h('tr',null,['Account Name','Branch Code','Account No.','Loan Amount','Status','MOB','Action'].map(c=>h('th',{key:c},c)))),
+        h('tbody',null,
+          loading?h('tr',null,h('td',{colSpan:7,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'Loading...'))
+          :records.length===0?h('tr',null,h('td',{colSpan:7,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'No records. Upload a CSV file first.'))
+          :records.slice(0,100).map((r,i)=>h('tr',{key:i},
+            h('td',{style:{fontWeight:500}},r.account_name),h('td',{style:{fontFamily:'monospace',fontSize:'.8125rem'}},r.branch_code),h('td',{style:{fontFamily:'monospace',fontSize:'.8125rem'}},r.account_no),
+            h('td',null,'₱'+Number(r.loan_amount||0).toLocaleString()),h('td',{style:{color:'#64748b',fontSize:'.8125rem'}},r.status||r.loanstatus||'—'),h('td',{style:{fontSize:'.8125rem'}},r.mob||'—'),
+            h('td',null,h('button',{style:{background:'none',border:'none',color:'#2563eb',cursor:'pointer',fontSize:'.8125rem',fontWeight:500},onClick:()=>{setAssignRec(r);setAForm({sa_id:'',priority:'P2'});}},'Assign'))
+          ))
+        )
+      )
+    ),
+    h(Modal,{open:!!assignRec,onClose:()=>setAssignRec(null),title:'Assign Customer'},
+      assignRec&&h('div',{style:{display:'flex',flexDirection:'column',gap:'1rem'}},
+        h('div',{style:{padding:'.75rem',background:'#f8fafc',borderRadius:'.625rem',fontSize:'.875rem'}},
+          h('div',{style:{fontWeight:500}},assignRec.account_name),
+          h('div',{style:{color:'#64748b',fontSize:'.8125rem'}},assignRec.branch_code+' · ₱'+Number(assignRec.loan_amount||0).toLocaleString()),
+          h('div',{style:{color:'#059669',fontSize:'.8125rem',marginTop:'.25rem',fontWeight:500}},'🏷️ Will be auto-tagged as Reloan')
+        ),
+        fld('Assign to SA *',h('select',{className:'input',value:aForm.sa_id,onChange:e=>setAForm(f=>({...f,sa_id:e.target.value}))},h('option',{value:''},'Select SA...'),saList.map(s=>h('option',{key:s.id,value:s.id},s.full_name+' ('+s.employee_id+')')))),
+        fld('Priority',h('select',{className:'input',value:aForm.priority,onChange:e=>setAForm(f=>({...f,priority:e.target.value}))},
+          [['P1','HIGH'],['P2','MID'],['P3','LOW']].map(([p,l])=>h('option',{key:p,value:p},`${p} — ${l}`))
+        )),
+        h('div',{style:{display:'flex',gap:'.75rem'}},
+          h('button',{className:'btn btn-primary',style:{flex:1},disabled:!aForm.sa_id,onClick:doAssign},'Assign Customer'),
+          h('button',{className:'btn btn-secondary',style:{flex:1},onClick:()=>setAssignRec(null)},'Cancel')
+        )
+      )
+    )
+  );
+}
+
+// ── Uploads ────────────────────────────────────────────────────────────────────
+function Uploads() {
+  const {apiFetch} = useAuth();
+  const [uploading,setUploading] = useState({});
+  const [results,setResults] = useState({});
+  const TABLES=[{key:'daily_lr',label:'Daily LR',desc:'Daily loan disbursement records',icon:'banknote'},{key:'lcs14',label:'LCS 14 (MOB 14)',desc:'Month-on-book 14 loan data',icon:'file-spreadsheet'},{key:'lcs18_pd_npl',label:'LCS 18 / PD_NPL',desc:'Non-performing loans MOB 18',icon:'alert-triangle'},{key:'deped_reloan',label:'DepEd Reloan',desc:'DepEd reloan tracking data',icon:'school'},{key:'deped_sor',label:'DepEd SOR',desc:'DepEd Statement of Releases',icon:'file-text'},{key:'deped_mob',label:'DepEd MOB',desc:'DepEd Month on Book data',icon:'bar-chart-2'}];
+  const upload = async (table, file) => {
+    if(!file.name.endsWith('.csv')) { toast.error('Only CSV files accepted'); return; }
+    setUploading(u=>({...u,[table]:true}));
+    const fd = new FormData(); fd.append('file',file);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`/api/uploads/${table}`,{method:'POST',headers:{Authorization:`Bearer ${token}`},body:fd});
+      const data = await res.json();
+      if(!res.ok) throw {response:{data}};
+      toast.success(`${data.inserted} records uploaded`);
+      setResults(r=>({...r,[table]:{success:true,count:data.inserted}}));
+    } catch(err) { toast.error(err?.response?.data?.error||'Upload failed'); setResults(r=>({...r,[table]:{success:false}})); }
+    finally { setUploading(u=>({...u,[table]:false})); }
+  };
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem'}},
+    h('div',null,h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'.25rem'}},'Data Uploads'),h('p',{style:{color:'#64748b',fontSize:'.875rem'}},'Upload CSV files for bulk data import. Admin only.')),
+    h('div',{className:'card',style:{background:'#fefce8',borderColor:'#fde68a',padding:'1rem'}},h('div',{style:{display:'flex',gap:'.75rem',alignItems:'center'}},Icon('triangle-alert',18,{color:'#92400e',flexShrink:0}),h('div',{style:{fontSize:'.875rem',color:'#92400e'}},h('strong',null,'CSV Format Required: '),'All files must be .csv only.'))),
+    h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'1rem'}},
+      TABLES.map(t=>h('div',{key:t.key,className:'card'},
+        h('div',{style:{display:'flex',alignItems:'flex-start',gap:'.75rem',marginBottom:'1rem'}},h('div',{style:{width:'2.5rem',height:'2.5rem',borderRadius:'.625rem',background:'#ede9fe',display:'flex',alignItems:'center',justifyContent:'center',color:'#4B006E',flexShrink:0}},Icon(t.icon,20)),h('div',null,h('div',{style:{fontWeight:600,color:'#0f172a'}},t.label),h('div',{style:{fontSize:'.8125rem',color:'#64748b'}},t.desc))),
+        h('label',{style:{display:'block',cursor:'pointer'}},
+          h('div',{style:{border:'2px dashed',borderColor:uploading[t.key]?'#4B006E':'#e9d5ff',borderRadius:'.75rem',padding:'1.25rem',textAlign:'center',background:uploading[t.key]?'#faf5ff':'#fdfcff'}},
+            uploading[t.key]?h('div',{style:{color:'#4B006E',fontSize:'.875rem',display:'flex',alignItems:'center',justifyContent:'center',gap:'.5rem'}},Icon('loader',16,{color:'#4B006E'}),'Uploading...')
+            :h(Fragment,null,h('div',{style:{display:'flex',justifyContent:'center',marginBottom:'.25rem'}},Icon('upload-cloud',28,{color:'#c4b5fd'})),h('div',{style:{fontSize:'.875rem',fontWeight:500,color:'#475569'}},'Drop CSV or click to browse'),h('div',{style:{fontSize:'.75rem',color:'#94a3b8',marginTop:'.125rem'}},'.csv files only'))
+          ),
+          h('input',{type:'file',accept:'.csv',style:{display:'none'},onChange:e=>{if(e.target.files[0])upload(t.key,e.target.files[0]);e.target.value='';},disabled:uploading[t.key]})
+        ),
+        results[t.key]&&h('div',{style:{marginTop:'.75rem',padding:'.625rem',borderRadius:'.5rem',fontSize:'.8125rem',display:'flex',alignItems:'center',gap:'.5rem',background:results[t.key].success?'#f0fdf4':'#fef2f2',color:results[t.key].success?'#166534':'#991b1b'}},Icon(results[t.key].success?'circle-check-big':'circle-x',14),results[t.key].success?`${results[t.key].count} records imported`:'Upload failed')
+      ))
+    )
+  );
+}
+
+// ── Promos ─────────────────────────────────────────────────────────────────────
+function Promos() {
+  const {user,apiFetch} = useAuth();
+  const [promos,setPromos] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [showModal,setShowModal] = useState(false);
+  const [editPromo,setEditPromo] = useState(null);
+  const [form,setForm] = useState({promo_agency:'DEPED',promo_name:'',date_start:'',date_end:'',description:'',changes_made:''});
+  const sf = k => v => setForm(f=>({...f,[k]:v}));
+  const load = () => apiFetch('/promos').then(setPromos).catch(console.error).finally(()=>setLoading(false));
+  useEffect(load,[]);
+  const openNew = () => { setEditPromo(null); setForm({promo_agency:'DEPED',promo_name:'',date_start:'',date_end:'',description:'',changes_made:''}); setShowModal(true); };
+  const openEdit = p => { setEditPromo(p); setForm({promo_agency:p.promo_agency,promo_name:p.promo_name,date_start:p.date_start,date_end:p.date_end,description:p.description||'',changes_made:''}); setShowModal(true); };
+  const submit = async e => {
+    e.preventDefault();
+    try { if(editPromo) { await apiFetch(`/promos/${editPromo.id}`,{method:'PUT',body:JSON.stringify(form)}); toast.success('Updated!'); } else { await apiFetch('/promos',{method:'POST',body:JSON.stringify(form)}); toast.success('Created!'); } setShowModal(false); load(); }
+    catch(err) { toast.error(err?.response?.data?.error||'Failed'); }
+  };
+  const del = async id => { if(!confirm('Delete?')) return; try { await apiFetch(`/promos/${id}`,{method:'DELETE'}); toast.success('Deleted'); load(); } catch { toast.error('Delete failed'); } };
+  const isActive = p => new Date(p.date_end) >= new Date();
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem'}},
+    h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
+      h('div',null,h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'.25rem'}},'Promos'),h('p',{style:{color:'#64748b',fontSize:'.875rem'}},'Active and expired promotional offers')),
+      user?.role==='Admin'&&h('button',{className:'btn btn-primary',onClick:openNew},'+ Create Promo')
+    ),
+    h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'1rem'}},
+      loading?h('div',{style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'Loading...')
+      :promos.length===0?h('div',{style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'No promos available.')
+      :promos.map(p=>h('div',{key:p.id,className:'card',style:{opacity:isActive(p)?1:0.6}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'.75rem'}},
+          h('div',null,h('div',{style:{marginBottom:'.25rem'}},Icon('tag',22,{color:'#4B006E'})),h('div',{style:{fontWeight:600,color:'#0f172a'}},p.promo_name),h('div',{style:{fontFamily:'monospace',fontSize:'.8125rem',color:'#94a3b8'}},p.promo_id)),
+          h('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'.25rem'}},
+            h('span',{className:'badge',style:{background:isActive(p)?'#d1fae5':'#fee2e2',color:isActive(p)?'#065f46':'#991b1b'}},isActive(p)?'✅ Active':'❌ Expired'),
+            h('span',{className:'badge',style:{background:'#eff6ff',color:'#1d4ed8'}},p.promo_agency)
+          )
+        ),
+        h('p',{style:{fontSize:'.875rem',color:'#475569',marginBottom:'.75rem'}},p.description),
+        h('div',{style:{fontSize:'.8125rem',color:'#94a3b8'}},h('div',null,'Start: ',h('span',{style:{color:'#374151',fontWeight:500}},p.date_start)),h('div',null,'End: ',h('span',{style:{color:'#374151',fontWeight:500}},p.date_end))),
+        user?.role==='Admin'&&h('div',{style:{display:'flex',gap:'.5rem',marginTop:'.75rem',paddingTop:'.75rem',borderTop:'1px solid #f1f5f9'}},
+          h('button',{className:'btn btn-secondary',style:{flex:1,fontSize:'.8125rem'},onClick:()=>openEdit(p)},'Edit'),
+          h('button',{className:'btn btn-danger',style:{flex:1,fontSize:'.8125rem'},onClick:()=>del(p.id)},'Delete')
+        )
+      ))
+    ),
+    h(Modal,{open:showModal,onClose:()=>setShowModal(false),title:editPromo?'Edit Promo':'Create Promo'},
+      h('form',{onSubmit:submit},
+        h('div',{className:'grid2'},
+          fld('Agency *',h('select',{className:'input',value:form.promo_agency,onChange:e=>sf('promo_agency')(e.target.value)},['DEPED','BEYOND_DEPED','PENSION'].map(a=>h('option',{key:a},a)))),
+          fld('Promo Name *',inp(form.promo_name,sf('promo_name'),{required:true})),
+          fld('Date Start *',inp(form.date_start,sf('date_start'),{type:'date',required:true})),
+          fld('Date End *',inp(form.date_end,sf('date_end'),{type:'date',required:true})),
+          h('div',{className:'span2'},fld('Description',h('textarea',{className:'input',rows:3,value:form.description,onChange:e=>sf('description')(e.target.value)}))),
+          editPromo&&h('div',{className:'span2'},fld('Changes Made',inp(form.changes_made,sf('changes_made'),{placeholder:'What changed...'}))),
+          h('div',{className:'span2',style:{display:'flex',gap:'.75rem'}},
+            h('button',{className:'btn btn-primary',type:'submit',style:{flex:1}},editPromo?'Update':'Create'),
+            h('button',{className:'btn btn-secondary',type:'button',style:{flex:1},onClick:()=>setShowModal(false)},'Cancel')
+          )
+        )
+      )
+    )
+  );
+}
+
+// ── Users ──────────────────────────────────────────────────────────────────────
+function Users() {
+  const {user,apiFetch} = useAuth();
+  const [users,setUsers] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [editUser,setEditUser] = useState(null);
+  const [eForm,setEForm] = useState({});
+  const [search,setSearch] = useState('');
+  const load = () => apiFetch('/users').then(setUsers).catch(console.error).finally(()=>setLoading(false));
+  useEffect(load,[]);
+  const openEdit = u => { setEditUser(u); setEForm({full_name:u.full_name,role:u.role,agency:u.agency,region_name:u.region_name,branch_code:u.branch_code,branch_name:u.branch_name,reports_to:u.reports_to||''}); };
+  const save = async () => {
+    try { await apiFetch(`/users/${editUser.id}`,{method:'PUT',body:JSON.stringify(eForm)}); toast.success('Updated!'); setEditUser(null); load(); }
+    catch(err) { toast.error(err?.response?.data?.error||'Failed'); }
+  };
+  const del = async id => { if(!confirm('Delete user?')) return; try { await apiFetch(`/users/${id}`,{method:'DELETE'}); toast.success('Deleted'); load(); } catch { toast.error('Delete failed'); } };
+  const filtered = users.filter(u=>u.full_name?.toLowerCase().includes(search.toLowerCase())||u.email?.toLowerCase().includes(search.toLowerCase())||u.employee_id?.toLowerCase().includes(search.toLowerCase()));
+  const RC = {SA:'#d1fae5 #065f46',ASH:'#dbeafe #1e40af',RSH:'#ede9fe #6d28d9',SH:'#ffedd5 #c2410c',Admin:'#fee2e2 #991b1b'};
+  return h('div',{style:{display:'flex',flexDirection:'column',gap:'1.25rem'}},
+    h('div',null,h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'.25rem'}},'Users'),h('p',{style:{color:'#64748b',fontSize:'.875rem'}},users.length+' registered users')),
+    inp(search,setSearch,{placeholder:'Search name, email, ID...',style:{maxWidth:'280px'}}),
+    h('div',{className:'card',style:{padding:0,overflow:'auto'}},
+      h('table',{className:'tbl'},
+        h('thead',null,h('tr',null,['Name','Email','Employee ID','Role','Agency','Branch','Region','Reports To',...(user?.role==='Admin'?['Actions']:[])].map(c=>h('th',{key:c},c)))),
+        h('tbody',null,
+          loading?h('tr',null,h('td',{colSpan:9,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'Loading...'))
+          :filtered.length===0?h('tr',null,h('td',{colSpan:9,style:{textAlign:'center',padding:'2.5rem',color:'#94a3b8'}},'No users found'))
+          :filtered.map(u=>{const [bg,tc]=(RC[u.role]||'#f1f5f9 #374151').split(' ');return h('tr',{key:u.id},
+            h('td',{style:{fontWeight:500}},u.full_name),
+            h('td',{style:{color:'#64748b',fontSize:'.8125rem'}},u.email),
+            h('td',{style:{fontFamily:'monospace',fontSize:'.8125rem',color:'#64748b'}},u.employee_id),
+            h('td',null,h('span',{className:'badge',style:{background:bg,color:tc}},u.role)),
+            h('td',{style:{fontSize:'.8125rem',color:'#64748b'}},u.agency),
+            h('td',{style:{fontSize:'.8125rem',color:'#64748b'}},u.branch_name),
+            h('td',{style:{fontSize:'.8125rem',color:'#64748b'}},u.region_name),
+            h('td',{style:{fontSize:'.8125rem',color:'#94a3b8'}},u.reports_to||'—'),
+            user?.role==='Admin'&&h('td',null,h('div',{style:{display:'flex',gap:'.5rem'}},
+              h('button',{style:{background:'none',border:'none',color:'#2563eb',cursor:'pointer',fontSize:'.8125rem',fontWeight:500},onClick:()=>openEdit(u)},'Edit'),
+              h('button',{style:{background:'none',border:'none',color:'#dc2626',cursor:'pointer',fontSize:'.8125rem',fontWeight:500},onClick:()=>del(u.id)},'Del')
+            ))
+          );})
+        )
+      )
+    ),
+    h(Modal,{open:!!editUser,onClose:()=>setEditUser(null),title:'Edit: '+(editUser?.full_name||'')},
+      editUser&&h('div',{style:{display:'flex',flexDirection:'column',gap:'.875rem'}},
+        fld('Full Name',inp(eForm.full_name,v=>setEForm(f=>({...f,full_name:v})))),
+        h('div',{className:'grid2'},
+          fld('Role',h('select',{className:'input',value:eForm.role,onChange:e=>setEForm(f=>({...f,role:e.target.value}))},['SA','ASH','RSH','SH','Admin'].map(r=>h('option',{key:r},r)))),
+          fld('Agency',h('select',{className:'input',value:eForm.agency,onChange:e=>setEForm(f=>({...f,agency:e.target.value}))},['DEPED','BEYOND_DEPED','PENSION','ALL'].map(a=>h('option',{key:a},a))))
+        ),
+        fld('Reports To',inp(eForm.reports_to,v=>setEForm(f=>({...f,reports_to:v})))),
+        h('div',{style:{display:'flex',gap:'.75rem'}},
+          h('button',{className:'btn btn-primary',style:{flex:1},onClick:save},'Save Changes'),
+          h('button',{className:'btn btn-secondary',style:{flex:1},onClick:()=>setEditUser(null)},'Cancel')
+        )
+      )
+    )
+  );
+}
+
+// ── Profile ────────────────────────────────────────────────────────────────────
+function Profile() {
+  const {user,apiFetch,refreshUser} = useAuth();
+  const [form,setForm] = useState({full_name:user?.full_name||'',reports_to:user?.reports_to||''});
+  const [loading,setLoading] = useState(false);
+  const RC={SA:'#d1fae5 #065f46',ASH:'#dbeafe #1e40af',RSH:'#ede9fe #6d28d9',SH:'#ffedd5 #c2410c',Admin:'#fee2e2 #991b1b'};
+  const [bg,tc]=(RC[user?.role]||'#f1f5f9 #374151').split(' ');
+  const save = async e => {
+    e.preventDefault(); setLoading(true);
+    try { await apiFetch('/users/me',{method:'PUT',body:JSON.stringify(form)}); await refreshUser(); toast.success('Profile updated!'); }
+    catch(err) { toast.error(err?.response?.data?.error||'Failed'); }
+    finally { setLoading(false); }
+  };
+  return h('div',{style:{maxWidth:'40rem'}},
+    h('h1',{style:{fontSize:'1.5rem',fontWeight:700,color:'#0f172a',marginBottom:'1.25rem'}},'My Profile'),
+    h('div',{className:'card'},
+      h('div',{style:{display:'flex',alignItems:'center',gap:'1.25rem',marginBottom:'1.5rem',paddingBottom:'1.25rem',borderBottom:'1px solid #f1f5f9'}},
+        h('div',{style:{width:'5rem',height:'5rem',borderRadius:'50%',background:'#2563eb',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:'2rem',fontWeight:700,flexShrink:0}},user?.full_name?.charAt(0)||'U'),
+        h('div',null,
+          h('h2',{style:{fontSize:'1.25rem',fontWeight:600,color:'#0f172a',marginBottom:'.25rem'}},user?.full_name),
+          h('p',{style:{color:'#64748b',fontSize:'.875rem',marginBottom:'.5rem'}},user?.email),
+          h('div',{style:{display:'flex',gap:'.5rem'}},h('span',{className:'badge',style:{background:bg,color:tc}},user?.role),h('span',{className:'badge',style:{background:'#f1f5f9',color:'#475569'}},user?.agency))
+        )
+      ),
+      h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1.5rem',fontSize:'.875rem'}},
+        [['Employee ID',user?.employee_id],['Branch',user?.branch_name],['Branch Code',user?.branch_code],['Region',user?.region_name],['Joined',user?.created_at?.slice(0,10)]].map(([k,v])=>
+          h('div',{key:k},h('div',{style:{fontSize:'.75rem',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:'.125rem'}},k),h('div',{style:{fontWeight:500,color:'#374151'}},v||'—'))
+        )
+      ),
+      h('form',{onSubmit:save,style:{display:'flex',flexDirection:'column',gap:'.875rem',paddingTop:'1.25rem',borderTop:'1px solid #f1f5f9'}},
+        h('h3',{style:{fontSize:'.9375rem',fontWeight:600,color:'#374151'}},'Edit Details'),
+        fld('Full Name',inp(form.full_name,v=>setForm(f=>({...f,full_name:v})))),
+        fld('Reporting To (Email)',inp(form.reports_to,v=>setForm(f=>({...f,reports_to:v})),{placeholder:'supervisor@csb.com'})),
+        h('button',{className:'btn btn-primary',type:'submit',disabled:loading,style:{alignSelf:'flex-start',padding:'.625rem 1.5rem'}},loading?'Saving...':'Save Changes')
+      ),
+      h('div',{style:{marginTop:'1.25rem',padding:'.75rem',background:'#eff6ff',borderRadius:'.625rem',fontSize:'.8125rem',color:'#1e3a8a'}},
+        h('strong',null,'⚠️ Important: '),'To correct your Employee ID, email, or role, contact your ASH.'
+      )
+    )
+  );
+}
+
+// ── App Router ─────────────────────────────────────────────────────────────────
+function AppContent() {
+  const {user} = useAuth();
+  const route = useRoute();
+  if (!user) {
+    if (route==='/register') return h(Register,null);
+    if (route==='/login') return h(Login,null);
+    if (route==='/') return h(Landing,null);
+    return h(Login,null);
+  }
+  const getPage = () => {
+    if (route==='/dashboard') return h(Dashboard,null);
+    if (route==='/customers') return h(Customers,null);
+    if (route.startsWith('/customers/')) return h(CustomerDetail,{id:route.split('/')[2]});
+    if (route==='/activities') return h(Activities,null);
+    if (route==='/calendar') return h(ActivityCalendar,null);
+    if (route==='/targets') return h(Targets,null);
+    if (route==='/target-shares') return h(TargetShares,null);
+    if (route==='/daily-lr') return h(DailyLR,null);
+    if (route==='/assign') return h(Assign,null);
+    if (route==='/uploads') return h(Uploads,null);
+    if (route==='/promos') return h(Promos,null);
+    if (route==='/users') return h(Users,null);
+    if (route==='/profile') return h(Profile,null);
+    return h(Dashboard,null);
+  };
+  return h(Layout,{page:getPage()});
+}
+
+function App() {
+  return h(AuthProvider,null, h(ToastContainer,null), h(AppContent,null));
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(h(App,null));
+</script>
+</body>
+</html>
